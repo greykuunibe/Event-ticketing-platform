@@ -209,7 +209,7 @@ function NewTicketContent() {
       //   window.location.href = paymentData.authorizationUrl
       // }
 
-      router.push(`/tickets/success/preview/`)
+      router.push(`/tickets/success/preview/${ticket.id}`)
 
     } catch (error) {
       console.error('Error:', error)
