@@ -3,6 +3,14 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 export async function GET() {
+  // Only allow in development
+  if (process.env.NODE_ENV !== 'development') {
+    return NextResponse.json(
+      { error: 'Not available in production' },
+      { status: 404 }
+    )
+  }
+
   try {
     const session = await getServerSession(authOptions)
     
@@ -33,4 +41,3 @@ export async function GET() {
     )
   }
 }
-
