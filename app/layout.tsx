@@ -10,8 +10,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Church Event Ticketing System",
-  description: "Reserve your tickets for the church event",
+  title: "Event Ticketing Platform",
+  description: "A lightweight ticketing solution for small communities who want to manage their events easily and securely.",
 };
 
 export default function RootLayout({
