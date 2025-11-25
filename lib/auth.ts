@@ -1,11 +1,65 @@
 import { NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
+import CredentialsProvider from 'next-auth/providers/credentials'
 import { supabase } from './supabase'
 import { verifyUserExists } from './auth-helpers'
+import bcrypt from 'bcryptjs'
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   providers: [
+    CredentialsProvider({
+      name: 'Credentials',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error('Email and password are required')
+        }
+
+        try {
+          // Get user from database
+          const { data: user, error } = await supabase
+            .from('users')
+            .select('id, email, name, password, deletedAt')
+            .eq('email', credentials.email)
+            .single()
+
+          if (error || !user) {
+            throw new Error('Invalid email or password')
+          }
+
+          // Check if user is deleted
+          if (user.deletedAt) {
+            throw new Error('Account has been deleted')
+          }
+
+          // Check if password exists
+          if (!user.password) {
+            throw new Error('Password not set for this account. Please contact support.')
+          }
+
+          // Verify password
+          const isValid = await bcrypt.compare(credentials.password, user.password)
+
+          if (!isValid) {
+            throw new Error('Invalid email or password')
+          }
+
+          // Return user object (without password)
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+          }
+        } catch (error: any) {
+          console.error('Credentials authorization error:', error)
+          throw new Error(error.message || 'Invalid email or password')
+        }
+      },
+    }),
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
@@ -16,22 +70,31 @@ export const authOptions: NextAuthOptions = {
       // Check if user exists and is deleted before allowing sign-in
       if (user?.email) {
         try {
-          const { data: existingUser, error } = await supabase
+          // Try query with deletedAt check first
+          let query = supabase
             .from('users')
             .select('id, deletedAt')
             .eq('email', user.email)
-            .is('deletedAt', null) // Only check non-deleted users
-            .single()
-
+          
+          // Try to filter by deletedAt, but handle if column doesn't exist
+          try {
+            query = query.is('deletedAt', null)
+          } catch (e) {
+            // If deletedAt column doesn't exist, just query without it
+            console.log('deletedAt column may not exist, querying without it')
+          }
+          
+          const { data: existingUser, error } = await query.single()
+    
           // If user doesn't exist (PGRST116 error), allow OAuth to complete but don't create user yet
           // The callback page will redirect to signup
           if (error && error.code === 'PGRST116') {
             // User doesn't exist - allow OAuth but don't create user
             return true
           }
-
+    
           // If user exists and is not deleted, update their info
-          if (existingUser && !existingUser.deletedAt) {
+          if (existingUser && (!existingUser.deletedAt || existingUser.deletedAt === null)) {
             try {
               const { error: updateError } = await supabase
                 .from('users')
@@ -41,7 +104,7 @@ export const authOptions: NextAuthOptions = {
                   emailVerified: new Date().toISOString(),
                 })
                 .eq('id', existingUser.id)
-
+    
               if (updateError) {
                 console.error('Error updating user:', updateError)
               }
@@ -50,7 +113,7 @@ export const authOptions: NextAuthOptions = {
             }
             return true
           }
-
+    
           // If user exists but is deleted (soft delete), block sign-in
           if (existingUser && existingUser.deletedAt) {
             console.error('Sign-in blocked: User was deleted', user.email)
@@ -61,10 +124,11 @@ export const authOptions: NextAuthOptions = {
           if (error && typeof error === 'object' && 'code' in error && error.code === 'PGRST116') {
             return true
           }
-          // Other errors - log but allow sign-in to proceed
+          // Other errors - log but allow sign-in to proceed (will redirect to signup)
           console.error('Error checking user in signIn callback:', error)
+          return true // Allow OAuth to complete, callback will handle redirect
         }
-
+    
         // Check if user was hard-deleted (in deleted_users table)
         try {
           const { data: deletedUser } = await supabase
@@ -72,7 +136,7 @@ export const authOptions: NextAuthOptions = {
             .select('id')
             .eq('email', user.email)
             .single()
-
+    
           if (deletedUser) {
             console.error('Sign-in blocked: User was hard-deleted', user.email)
             return false
@@ -86,14 +150,21 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, account, trigger }) {
       // Initial sign in - verify user exists in database before storing id in token
       if (user) {
-        // Store Google ID temporarily (even if user doesn't exist in DB)
+        // For credentials provider, user.id is already set from authorize function
+        if (account?.provider === 'credentials' && user.id) {
+          token.id = user.id
+          token.passwordVerified = true // Mark that password was verified
+          return token
+        }
+
+        // For Google OAuth - store Google ID temporarily (even if user doesn't exist in DB)
         // This will be used for signup
-        if (user.id) {
+        if (user.id && account?.provider === 'google') {
           token.googleId = user.id
         }
 
-        // Check if user exists in database by email
-        if (user.email) {
+        // Check if user exists in database by email (for Google OAuth)
+        if (user.email && account?.provider === 'google') {
           try {
             const { data: existingUser, error } = await supabase
               .from('users')
@@ -105,12 +176,23 @@ export const authOptions: NextAuthOptions = {
             // Only set token.id if user exists in database
             if (existingUser && !error) {
               token.id = existingUser.id
+            } else if (error) {
+              // Check if error is "not found" (user doesn't exist)
+              if (error.code === 'PGRST116') {
+                // User doesn't exist - token.id will remain undefined
+                // This will cause callback page to redirect to signup
+                console.log('User not found in database, will redirect to signup:', user.email)
+              } else {
+                // Other database errors (like missing column) - log but don't set id
+                console.error('Database error checking user:', error.message)
+                // Don't set token.id so user gets redirected to signup
+              }
             }
-            // If user doesn't exist, token.id will remain undefined
-            // This will cause callback page to redirect to signup
-          } catch (error) {
-            // User doesn't exist - don't set token.id
-            console.log('User not found in database during JWT creation:', user.email)
+          } catch (error: any) {
+            // Catch any unexpected errors
+            console.error('Error checking user in JWT callback:', error)
+            // Don't set token.id - user will be redirected to signup
+            // This handles cases like missing deletedAt column gracefully
           }
         }
       }
@@ -144,14 +226,64 @@ export const authOptions: NextAuthOptions = {
       if (token.googleId && typeof token.googleId === 'string') {
         (session as any).googleId = token.googleId
       }
+      // Store password verification status
+      if (token.passwordVerified) {
+        (session as any).passwordVerified = true
+      }
       return session
     },
     async redirect({ url, baseUrl }) {
+      // Ensure baseUrl is valid
+      if (!baseUrl) {
+        baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+      }
+
+      // If the URL is the callback page, allow it (handle both relative and absolute)
+      if (url.includes('/auth/callback')) {
+        // If it's already a full URL, return as is
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+          return url
+        }
+        // If it's relative, make it absolute
+        return url.startsWith('/') ? `${baseUrl}${url}` : `${baseUrl}/${url}`
+      }
+      
       // Allows relative callback URLs
-      if (url.startsWith('/')) return `${baseUrl}${url}`
-      // Allows callback URLs on the same origin
-      if (new URL(url).origin === baseUrl) return url
-      return baseUrl
+      if (url.startsWith('/')) {
+        // For admin routes or if no specific URL, always go through callback page
+        // Default to dashboard for admin authentication
+        const destination = url === '/' || url === baseUrl ? '/admin/dashboard' : url
+        const callbackUrl = encodeURIComponent(destination)
+        return `${baseUrl}/auth/callback?callbackUrl=${callbackUrl}`
+      }
+      
+      // Try to parse as absolute URL only if it's not a relative path
+      try {
+        // If url doesn't have a protocol, it might be a relative URL that slipped through
+        if (!url.includes('://')) {
+          // Treat as relative path
+          const destination = url === '/' || url === baseUrl ? '/admin/dashboard' : url.startsWith('/') ? url : `/${url}`
+          const callbackUrl = encodeURIComponent(destination)
+          return `${baseUrl}/auth/callback?callbackUrl=${callbackUrl}`
+        }
+        
+        const parsedUrl = new URL(url)
+        // Allows callback URLs on the same origin
+        if (parsedUrl.origin === baseUrl || parsedUrl.origin === new URL(baseUrl).origin) {
+          const destination = url === baseUrl ? '/admin/dashboard' : parsedUrl.pathname + parsedUrl.search
+          const callbackUrl = encodeURIComponent(destination)
+          return `${baseUrl}/auth/callback?callbackUrl=${callbackUrl}`
+        }
+      } catch (e) {
+        // If URL parsing fails (e.g., relative URL or invalid format), treat as relative path
+        console.warn('Failed to parse URL in redirect callback:', url, e)
+        const destination = url === '/' ? '/admin/dashboard' : url.startsWith('/') ? url : `/${url}`
+        const callbackUrl = encodeURIComponent(destination)
+        return `${baseUrl}/auth/callback?callbackUrl=${callbackUrl}`
+      }
+      
+      // Default to dashboard
+      return `${baseUrl}/auth/callback?callbackUrl=${encodeURIComponent('/admin/dashboard')}`
     },
   },
   debug: process.env.NODE_ENV === 'development',

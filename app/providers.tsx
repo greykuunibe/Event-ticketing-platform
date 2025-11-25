@@ -6,8 +6,8 @@ import { NotificationProvider } from '@/hooks/useNotification'
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider
-      refetchInterval={5 * 60} // Refetch session every 5 minutes
-      refetchOnWindowFocus={true} // Refetch when window gains focus
+      refetchInterval={10 * 60} // Refetch session every 10 minutes
+      refetchOnWindowFocus={false} // Disable refetch on window focus to prevent refresh
     >
       <NotificationProvider>
         {children}
@@ -15,4 +15,3 @@ export function Providers({ children }: { children: React.ReactNode }) {
     </SessionProvider>
   )
 }
-

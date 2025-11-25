@@ -21,7 +21,16 @@ export async function GET(
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
     }
 
-    return NextResponse.json(ticket)
+    // Transform ticket_items to items format for consistency
+    const transformedTicket = {
+      ...ticket,
+      items: (ticket as any).ticket_items?.map((item: any) => ({
+        dish: item.dish,
+        drink: item.drink,
+      })) || [],
+    }
+
+    return NextResponse.json(transformedTicket)
   } catch (error) {
     console.error('Error fetching ticket:', error)
     return NextResponse.json(

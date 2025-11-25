@@ -83,10 +83,11 @@ export default function TicketDisplay({ ticket }: TicketDisplayProps) {
           </div>
 
           {/* Items */}
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Your Selections</h2>
-            <div className="space-y-3">
-              {ticket.items.map((item, index) => (
+          {ticket.items && ticket.items.length > 0 && (
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-3">Your Selections</h2>
+              <div className="space-y-3">
+                {ticket.items.map((item, index) => (
                 <div
                   key={index}
                   className="border border-gray-200 rounded-xl p-3 bg-gray-50"
@@ -110,9 +111,10 @@ export default function TicketDisplay({ ticket }: TicketDisplayProps) {
                     </div>
                   </div>
                 </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Bottom info area (replacing QR/barcode) */}
           <div className="pt-4 border-t border-dashed border-gray-200 text-xs text-gray-700">

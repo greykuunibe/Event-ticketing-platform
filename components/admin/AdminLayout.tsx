@@ -20,7 +20,7 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
   // Clear search data when route changes (pages will re-register their data)
   useEffect(() => {
     clearData()
-  }, [pathname, clearData])
+  }, [pathname]) // Remove clearData - it's stable from zustand
 
   return (
     <>

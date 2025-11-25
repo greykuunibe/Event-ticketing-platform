@@ -268,7 +268,9 @@ export default function EventsPage() {
                   <input
                     type="datetime-local"
                     name="eventDate"
+                    min={new Date().toISOString().slice(0, 16)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-gray-300 transition-colors"
+                    required
                   />
                 </div>
                 <div>

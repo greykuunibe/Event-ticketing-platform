@@ -97,22 +97,21 @@ export default function TicketsPage() {
   }, [selectedEventId, router])
 
   useEffect(() => {
-    if (status === 'authenticated' && session) {
+    if (status === 'authenticated' && session?.user?.id) {
       if (viewMode === 'tickets') {
         fetchTickets()
         // Also fetch ticket types for filtering
         fetchTicketTypes()
-        // Set up real-time polling every 10 seconds
+        // Set up real-time polling every 50 seconds
         const interval = setInterval(() => {
           fetchTickets()
-        }, 10000)
+        }, 50000)
         return () => clearInterval(interval)
       } else {
         fetchTicketTypes()
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, session, viewMode, selectedEventId])
+  }, [status, session?.user?.id, viewMode, selectedEventId]) // Use session?.user?.id instead of session
 
   const fetchTicketTypes = async () => {
     try {

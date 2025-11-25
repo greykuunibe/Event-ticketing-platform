@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import AdminLayout from '@/components/admin/AdminLayout'
@@ -12,16 +12,22 @@ export default function AdminLayoutWrapper({
 }) {
   const router = useRouter()
   const { data: session, status } = useSession()
+  const hasRedirected = useRef(false)
 
   useEffect(() => {
+    // Prevent multiple redirects
+    if (hasRedirected.current) return
+
     if (status === 'unauthenticated') {
+      hasRedirected.current = true
       router.replace('/auth/signin?callbackUrl=' + encodeURIComponent(window.location.pathname))
     } else if (status === 'authenticated' && !session?.user?.id) {
       // User was deleted - sign out and redirect
+      hasRedirected.current = true
       signOut({ redirect: false })
       router.replace('/auth/signin')
     }
-  }, [status, session, router])
+  }, [status, session?.user?.id, router]) // Use session?.user?.id instead of session
 
   if (status === 'loading') {
     return (
@@ -39,4 +45,3 @@ export default function AdminLayoutWrapper({
 
   return <AdminLayout>{children}</AdminLayout>
 }
-

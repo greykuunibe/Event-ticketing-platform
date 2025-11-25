@@ -3,6 +3,30 @@ import { verifyPayment } from '@/lib/paystack'
 import { supabase } from '@/lib/supabase'
 import { sendTicketEmail } from '@/lib/email'
 
+// Handle GET requests - redirect users to success page
+// Paystack sometimes redirects users to the webhook URL after payment
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const reference = searchParams.get('reference') || searchParams.get('trxref')
+    
+    if (reference) {
+      // Redirect to success page with the payment reference
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin
+      return NextResponse.redirect(`${baseUrl}/tickets/success/${reference}`)
+    }
+    
+    // If no reference, redirect to home
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin
+    return NextResponse.redirect(`${baseUrl}/`)
+  } catch (error) {
+    console.error('Error handling webhook redirect:', error)
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin
+    return NextResponse.redirect(`${baseUrl}/`)
+  }
+}
+
+// Handle POST requests - actual webhook from Paystack servers
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()

@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn, useSession } from 'next-auth/react'
-import { SpinnerIcon, TicketIcon } from '@phosphor-icons/react'
+import { SpinnerIcon, TicketIcon, EyeIcon, EyeSlashIcon } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 
@@ -13,21 +13,29 @@ function SignUpContent() {
   const { data: session } = useSession()
   const [formData, setFormData] = useState({
     name: '',
+    password: '',
+    confirmPassword: '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [googleId, setGoogleId] = useState<string | null>(null)
+  const [isGoogleSignup, setIsGoogleSignup] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(true)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const callbackUrl = searchParams.get('callbackUrl') || '/admin/dashboard'
   const email = searchParams.get('email')
   const id = searchParams.get('id')
   const message = searchParams.get('message')
 
   useEffect(() => {
+    // Set email from URL params
     if (email) {
       setUserEmail(email)
       if (id) {
         setGoogleId(id)
+        setIsGoogleSignup(true) // Email comes from Google OAuth
         // Pre-fill name from email if available
         if (!formData.name) {
           setFormData(prev => ({ ...prev, name: email.split('@')[0] }))
@@ -37,23 +45,49 @@ function SignUpContent() {
     if (message) {
       setError(message)
     }
+    // Mark initialization as complete
+    setIsInitializing(false)
   }, [email, id, formData.name, message])
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.name || !userEmail) return
+    // For Google signup, only password is required (name and email are from Google)
+    // For regular signup, all fields are required
+    if (isGoogleSignup) {
+      if (!formData.password || !userEmail) {
+        setError('Password is required')
+        return
+      }
+    } else {
+      if (!formData.name || !userEmail || !formData.password) {
+        setError('All fields are required')
+        return
+      }
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long')
+      return
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
 
     setLoading(true)
     setError(null)
 
     try {
       // Create user account
+      // For Google signup, name is optional (will default to email prefix)
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: userEmail,
-          name: formData.name,
+          name: isGoogleSignup ? (formData.name || undefined) : formData.name,
+          password: formData.password,
           googleId,
         }),
       })
@@ -66,9 +100,13 @@ function SignUpContent() {
         return
       }
 
-      // Account created - redirect to sign in with Google
-      await signIn('google', {
-        callbackUrl,
+      // Account created - sign in with credentials
+      // For Google signup, use the name from form or email prefix
+      const userName = formData.name || userEmail?.split('@')[0] || 'User'
+      await signIn('credentials', {
+        email: userEmail,
+        password: formData.password,
+        callbackUrl: `/auth/callback?callbackUrl=${encodeURIComponent(callbackUrl)}`,
         redirect: true,
       })
     } catch (error) {
@@ -78,15 +116,18 @@ function SignUpContent() {
     }
   }
 
-  const handleGoogleSignUp = async () => {
-    // Redirect to Google sign-in, then back to callback
-    await signIn('google', {
-      callbackUrl,
-      redirect: true,
-    })
+  // Show loading while initializing
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-stone-100 flex items-center justify-center">
+        <div className="text-center">
+          <SpinnerIcon className="animate-spin text-orange-600" size={48} />
+        </div>
+      </div>
+    )
   }
 
-  // If no email, redirect to signin
+  // If no email after initialization, redirect to signin
   if (!userEmail) {
     router.replace(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`)
     return null
@@ -122,7 +163,7 @@ function SignUpContent() {
         <form onSubmit={handleSignUp} className="space-y-4">
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2 text-left">
-              Full Name
+              Full Name {isGoogleSignup && <span className="text-gray-400 text-xs">(optional)</span>}
             </label>
             <input
               type="text"
@@ -130,10 +171,71 @@ function SignUpContent() {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full px-4 py-2 bg-white shadow-sm border border-gray-300 rounded-lg focus:outline-zinc-800 focus:border-gray-200 transition-colors text-left"
-              placeholder="Enter your full name"
-              required
-              autoFocus
+              placeholder={isGoogleSignup ? "Enter your full name (optional)" : "Enter your full name"}
+              required={!isGoogleSignup}
+              autoFocus={!isGoogleSignup}
             />
+          </div>
+
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2 text-left">
+              Password
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                id="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                className="w-full px-4 py-2 pr-10 bg-white shadow-sm border border-gray-300 rounded-lg focus:outline-zinc-800 focus:border-gray-200 transition-colors text-left"
+                placeholder="Enter your password (min. 6 characters)"
+                required
+                minLength={6}
+                autoFocus={isGoogleSignup}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? (
+                  <EyeSlashIcon size={20} weight="regular" />
+                ) : (
+                  <EyeIcon size={20} weight="regular" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2 text-left">
+              Confirm Password
+            </label>
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                id="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                className="w-full px-4 py-2 pr-10 bg-white shadow-sm border border-gray-300 rounded-lg focus:outline-zinc-800 focus:border-gray-200 transition-colors text-left"
+                placeholder="Confirm your password"
+                required
+                minLength={6}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+              >
+                {showConfirmPassword ? (
+                  <EyeSlashIcon size={20} weight="regular" />
+                ) : (
+                  <EyeIcon size={20} weight="regular" />
+                )}
+              </button>
+            </div>
           </div>
 
           <motion.button
@@ -141,7 +243,7 @@ function SignUpContent() {
             whileTap={{ scale: 0.95 }}
             whileHover={{ scale: 1.02 }}
             transition={{ type: "spring", stiffness: 400, damping: 17 }}
-            disabled={loading || !formData.name}
+            disabled={loading || (!isGoogleSignup && !formData.name) || !formData.password || !formData.confirmPassword}
             className="flex items-center justify-center gap-2 w-full bg-gradient-to-br from-zinc-900 to-zinc-700 border border-zinc-200 text-center text-white px-4 py-2 rounded-xl active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? (

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { notFound, useParams } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import TicketDisplay from '@/components/ticket/TicketDisplay'
 import { BeerBottleIcon } from '@phosphor-icons/react'
 
@@ -33,18 +33,34 @@ export default function TicketSuccessPage() {
         if (!response.ok) throw new Error('Failed to fetch ticket')
 
         const tickets = await response.json()
-        const foundTicket = tickets.find(
-          (t: Ticket) => t.paymentReference === ticketId || t.id === ticketId
+        const foundTicket: any = tickets.find(
+          (t: any) => t.paymentReference === ticketId || t.id === ticketId
         )
 
         if (foundTicket) {
-          setTicket(foundTicket)
+          // Transform ticket_items to items format
+          const transformedTicket: Ticket = {
+            ...foundTicket,
+            items: foundTicket.ticket_items?.map((item: any) => ({
+              dish: item.dish,
+              drink: item.drink,
+            })) || foundTicket.items || [],
+          }
+          setTicket(transformedTicket)
         } else {
           // Try direct ID lookup
           const directResponse = await fetch(`/api/tickets/${ticketId}`)
           if (directResponse.ok) {
-            const directTicket = await directResponse.json()
-            setTicket(directTicket)
+            const directTicket: any = await directResponse.json()
+            // Transform ticket_items to items format
+            const transformedTicket: Ticket = {
+              ...directTicket,
+              items: directTicket.ticket_items?.map((item: any) => ({
+                dish: item.dish,
+                drink: item.drink,
+              })) || directTicket.items || [],
+            }
+            setTicket(transformedTicket)
           } else {
             setError('Ticket not found')
           }
@@ -74,7 +90,14 @@ export default function TicketSuccessPage() {
   }
 
   if (error || !ticket) {
-    return notFound();
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error || 'Ticket not found'}</p>
+          <p className="text-gray-600">Please check your ticket ID and try again.</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -82,13 +105,12 @@ export default function TicketSuccessPage() {
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {ticket.paymentStatus === 'paid' ? 'Payment Successful!' : 'Ticket Created'}
+            Payment Successful!
           </h1>
-          <p className="text-gray-600">
-            {ticket.paymentStatus === 'paid'
-              ? 'Your payment has been confirmed. Your ticket is below.'
-              : 'Your ticket has been created. Please complete payment to confirm your reservation.'}
+          <p className="mb-6">
+            Download ticket as PNG.
           </p>
+          <p className="text-red-500 text-sm">*Keep this information safe as it may be required for verification on entry.</p>
         </div>
         <TicketDisplay ticket={ticket} />
       </div>

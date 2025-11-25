@@ -6,7 +6,7 @@ import { useNotification } from '@/hooks/useNotification'
 import PersonalInfoForm from '@/components/booking/PersonalInfoForm'
 import TicketTypeSelection from '@/components/booking/TicketTypeSelection'
 import TicketItemsForm from '@/components/booking/TicketItemsForm'
-import { ArrowLeft, ArrowLeftIcon, CalendarDotsIcon, MapPinLineIcon, Spinner, SpinnerIcon, TicketIcon } from '@phosphor-icons/react'
+import { ArrowLeft, ArrowLeftIcon, CalendarDotsIcon, MapPinLineIcon, Spinner, SpinnerIcon, TicketIcon, PlusIcon, MinusIcon } from '@phosphor-icons/react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -43,6 +43,7 @@ function NewTicketContent() {
   const [personalInfo, setPersonalInfo] = useState<PersonalInfo | null>(null)
   const [selectedTicketType, setSelectedTicketType] = useState<string | null>(null)
   const [quantity, setQuantity] = useState<number>(1)
+  const [quantityInput, setQuantityInput] = useState<string>('1')
   const [ticketPrice, setTicketPrice] = useState<number>(0)
   const [ticketItems, setTicketItems] = useState<TicketItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -115,6 +116,7 @@ function NewTicketContent() {
     setSelectedTicketType(type)
     setTicketPrice(price)
     setQuantity(1) // Reset quantity
+    setQuantityInput('1')
   }
 
   const handleTicketTypeContinue = () => {
@@ -165,6 +167,23 @@ function NewTicketContent() {
       return
     }
 
+    // Validate ticket type is selected
+    if (!selectedTicketType) {
+      showError('Please select a ticket type')
+      setIsLoading(false)
+      return
+    }
+
+    // Get ticket type name - fallback to ID if name lookup fails
+    const ticketTypeName = getTicketTypeName(selectedTicketType)
+    const ticketTypeToSend = ticketTypeName || selectedTicketType // Use name if available, otherwise send ID
+
+    if (!ticketTypeToSend || ticketTypeToSend.trim() === '') {
+      showError('Invalid ticket type. Please try selecting again.')
+      setIsLoading(false)
+      return
+    }
+
     setIsLoading(true)
     try {
       // Create ticket
@@ -176,7 +195,7 @@ function NewTicketContent() {
           fullName: personalInfo!.fullName,
           phoneNumber: personalInfo!.phoneNumber,
           email: personalInfo!.email,
-          ticketType: getTicketTypeName(selectedTicketType!),
+          ticketType: ticketTypeToSend,
           quantity: quantity,
           items: ticketItems,
         }),
@@ -189,27 +208,27 @@ function NewTicketContent() {
       const ticket = await ticketResponse.json()
 
       // Initialize payment
-      // const paymentResponse = await fetch('/api/paystack/initialize', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     ticketId: ticket.id,
-      //     email: personalInfo!.email || 'customer@example.com',
-      //   }),
-      // })
+      const paymentResponse = await fetch('/api/paystack/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticketId: ticket.id,
+          email: personalInfo!.email || 'customer@example.com',
+        }),
+      })
 
-      // if (!paymentResponse.ok) {
-      //   throw new Error('Failed to initialize payment')
-      // }
+      if (!paymentResponse.ok) {
+        throw new Error('Failed to initialize payment')
+      }
 
-      // const paymentData = await paymentResponse.json()
+      const paymentData = await paymentResponse.json()
 
-      // // Redirect to Paystack
-      // if (paymentData.authorizationUrl) {
-      //   window.location.href = paymentData.authorizationUrl
-      // }
+      // Redirect to Paystack
+      if (paymentData.authorizationUrl) {
+        window.location.href = paymentData.authorizationUrl
+      }
 
-      router.push(`/tickets/success/preview/${ticket.id}`)
+      router.push(`/tickets/success/${ticket.id}`)
 
     } catch (error) {
       console.error('Error:', error)
@@ -340,7 +359,7 @@ function NewTicketContent() {
         </AnimatePresence>
 
         {/* Progress Steps - Outside form at top */}
-        <div className="mb-8 w-full flex items-center justify-center">
+        <div className="mb-8 max-w-2xl w-full flex items-center justify-center">
           <div className="flex items-start justify-between  text-center  max-w-2xl w-full">
             {['personal', 'ticket-type', 'quantity', 'items'].map((s, index) => {
               const isActive = step === s
@@ -449,14 +468,68 @@ function NewTicketContent() {
                   <label className="block text-sm font-medium text-gray-700 mb-2 text-left">
                     Quantity
                   </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={quantity}
-                    onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                    className="w-full px-4 py-2 bg-white shadow-sm border border-gray-300 rounded-lg focus:outline-zinc-800 focus:border-gray-200 transition-colors text-left"
-                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newQuantity = Math.max(1, quantity - 1)
+                        setQuantity(newQuantity)
+                        setQuantityInput(newQuantity.toString())
+                      }}
+                      disabled={quantity <= 1}
+                      className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
+                      aria-label="Decrease quantity"
+                    >
+                      <MinusIcon size={20} weight="bold" />
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={quantityInput}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setQuantityInput(value)
+                        // Allow empty string for typing
+                        if (value === '') {
+                          return
+                        }
+                        const numValue = parseInt(value)
+                        if (!isNaN(numValue) && numValue >= 1 && numValue <= 10) {
+                          setQuantity(numValue)
+                        }
+                      }}
+                      onBlur={(e) => {
+                        // If empty or invalid, reset to current quantity
+                        const value = e.target.value
+                        if (value === '' || isNaN(parseInt(value)) || parseInt(value) < 1) {
+                          setQuantityInput(quantity.toString())
+                        } else {
+                          const numValue = Math.min(10, Math.max(1, parseInt(value)))
+                          setQuantity(numValue)
+                          setQuantityInput(numValue.toString())
+                        }
+                      }}
+                      onFocus={(e) => {
+                        // Select all text on focus for easy editing
+                        e.target.select()
+                      }}
+                      className="flex-1 px-4 py-2 bg-white shadow-sm border border-gray-300 rounded-lg focus:outline-zinc-800 focus:border-gray-200 transition-colors text-center text-lg font-medium"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newQuantity = Math.min(10, quantity + 1)
+                        setQuantity(newQuantity)
+                        setQuantityInput(newQuantity.toString())
+                      }}
+                      disabled={quantity >= 10}
+                      className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
+                      aria-label="Increase quantity"
+                    >
+                      <PlusIcon size={20} weight="bold" />
+                    </button>
+                  </div>
                   <p className="text-sm text-gray-500 mt-2 text-left">
                     {getPeoplePerTicket()} person(s) per ticket × {quantity} ticket(s) = {getTotalSelections()} meal/drink selection(s)
                   </p>

@@ -26,13 +26,15 @@ export default function AdminSidebar() {
   const pathname = usePathname()
   const openSearch = useSearchStore((state) => state.openSearch)
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     // Sign out from NextAuth (clears session, JWT token, etc.)
-    // and redirect to home page
-    signOut({ 
-      callbackUrl: '/',
-      redirect: true 
+    // Use redirect: false and manually redirect to show proper loading state
+    await signOut({ 
+      callbackUrl: '/auth/callback?callbackUrl=/',
+      redirect: false 
     })
+    // Manually redirect to callback page which will show "Signing out..." message
+    window.location.href = '/auth/callback?callbackUrl=/'
   }
 
   return (

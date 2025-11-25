@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, name, googleId } = await request.json()
+    const { email, name, password, googleId } = await request.json()
 
     if (!email) {
       return NextResponse.json(
@@ -12,12 +13,55 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!password) {
+      return NextResponse.json(
+        { error: 'Password is required' },
+        { status: 400 }
+      )
+    }
+
+    if (password.length < 6) {
+      return NextResponse.json(
+        { error: 'Password must be at least 6 characters long' },
+        { status: 400 }
+      )
+    }
+
+    // Test database connection first
+    const { error: connectionError } = await supabase
+      .from('users')
+      .select('id')
+      .limit(1)
+
+    if (connectionError) {
+      console.error('Database connection error:', connectionError)
+      return NextResponse.json(
+        { 
+          error: 'Database connection failed. Please check your Supabase configuration.',
+          details: connectionError.message 
+        },
+        { status: 500 }
+      )
+    }
+
     // Check if user already exists
-    const { data: existingUser } = await supabase
+    const { data: existingUser, error: checkError } = await supabase
       .from('users')
       .select('id, name, deletedAt')
       .eq('email', email)
       .single()
+
+    // If error is not "not found", it's a real error
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('Error checking user:', checkError)
+      return NextResponse.json(
+        { 
+          error: 'Failed to check user existence',
+          details: checkError.message 
+        },
+        { status: 500 }
+      )
+    }
 
     // Check if user was hard-deleted (in deleted_users table)
     const { data: deletedUser } = await supabase
@@ -49,22 +93,46 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10)
+
     // Create user
-    const { data: user, error } = await supabase
+    const { data: user, error: createError } = await supabase
       .from('users')
       .insert({
         id: googleId || crypto.randomUUID(),
         email,
         name: name || email.split('@')[0],
+        password: hashedPassword,
         emailVerified: new Date().toISOString(),
+        deletedAt: null, // Explicitly set to null
       })
       .select()
       .single()
 
-    if (error) {
-      console.error('Error creating user:', error)
+    if (createError) {
+      console.error('Error creating user:', createError)
+      
+      // Provide more specific error messages
+      if (createError.code === '23505') { // Unique constraint violation
+        return NextResponse.json(
+          { error: 'An account with this email already exists. Please sign in instead.' },
+          { status: 409 }
+        )
+      }
+      
+      if (createError.code === '23503') { // Foreign key violation
+        return NextResponse.json(
+          { error: 'Database constraint error. Please contact support.' },
+          { status: 500 }
+        )
+      }
+
       return NextResponse.json(
-        { error: 'Failed to create user' },
+        { 
+          error: 'Failed to create user account',
+          details: createError.message 
+        },
         { status: 500 }
       )
     }
@@ -75,10 +143,13 @@ export async function POST(request: NextRequest) {
       email: user.email,
       name: user.name,
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in signup:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        details: error.message 
+      },
       { status: 500 }
     )
   }

@@ -87,7 +87,7 @@ export default function AdminDashboard() {
         }
         throw new Error('Failed to fetch tickets')
       }
-
+  
       const data = await response.json()
       setTickets(data.tickets)
       setFilteredTickets(data.tickets)
@@ -97,20 +97,19 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false)
     }
-  }, [selectedEventId, router])
+  }, [selectedEventId, router]) // Make sure all dependencies are here
 
   useEffect(() => {
-    if (status === 'authenticated' && session) {
+    if (status === 'authenticated' && session?.user?.id) {
       fetchTickets()
-      // Set up real-time polling every 10 seconds
+      // Set up real-time polling every 50 seconds
       const interval = setInterval(() => {
         fetchTickets()
-      }, 10000)
-
+      }, 50000)
+  
       return () => clearInterval(interval)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, session, selectedEventId])
+  }, [status, session?.user?.id, selectedEventId, fetchTickets]) 
 
   const { registerSearchHandler } = useSearch()
 

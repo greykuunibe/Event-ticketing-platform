@@ -6,10 +6,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { eventId, fullName, phoneNumber, email, ticketType, quantity, items } = body
 
-    // Validate eventId is provided
+    // Validate required fields
     if (!eventId) {
       return NextResponse.json(
         { error: 'Event ID is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!ticketType || ticketType.trim() === '') {
+      return NextResponse.json(
+        { error: 'Ticket type is required' },
         { status: 400 }
       )
     }
@@ -25,16 +32,70 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 })
     }
 
-    // Calculate total amount based on ticket type and quantity
-    const ticketPrices: Record<string, number> = {
-      'Regular Single': 120,
-      'Regular Couple': 240,
-      'VIP Couple': 300,
+    // Get event's userId to fetch correct ticket types
+    const { data: eventWithUser, error: eventUserError } = await supabase
+      .from('events')
+      .select('userId')
+      .eq('id', eventId)
+      .single()
+
+    if (eventUserError || !eventWithUser || !eventWithUser.userId) {
+      return NextResponse.json(
+        { error: 'Event configuration error' },
+        { status: 500 }
+      )
     }
 
-    const pricePerTicket = ticketPrices[ticketType] || 0
+    // Check if ticketType is a UUID (ID) or a name string
+    // UUID format: 8-4-4-4-12 hexadecimal characters
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ticketType)
+    
+    // Fetch ticket type price from database - try by ID first, then by name
+    let ticketTypeQuery = supabase
+      .from('ticket_types')
+      .select('id, name, price')
+      .eq('userId', eventWithUser.userId)
+
+    if (isUUID) {
+      ticketTypeQuery = ticketTypeQuery.eq('id', ticketType)
+    } else {
+      ticketTypeQuery = ticketTypeQuery.eq('name', ticketType.trim())
+    }
+
+    const { data: ticketTypeData, error: ticketTypeError } = await ticketTypeQuery.single()
+
+    if (ticketTypeError || !ticketTypeData) {
+      console.error('Error fetching ticket type:', {
+        error: ticketTypeError,
+        ticketType,
+        isUUID,
+        userId: eventWithUser.userId
+      })
+      
+      // Try to get available ticket types for better error message
+      const { data: availableTypes } = await supabase
+        .from('ticket_types')
+        .select('id, name')
+        .eq('userId', eventWithUser.userId)
+      
+      const availableNames = availableTypes?.map(t => t.name).join(', ') || 'none'
+      
+      return NextResponse.json(
+        { 
+          error: `Ticket type "${ticketType}" not found or not configured for this event. Available types: ${availableNames}`,
+          availableTypes: availableTypes?.map(t => ({ id: t.id, name: t.name })) || []
+        },
+        { status: 400 }
+      )
+    }
+
+    // Calculate total amount based on ticket type price and quantity
+    const pricePerTicket = parseFloat(ticketTypeData.price.toString())
     const ticketQuantity = quantity || 1
     const totalAmount = pricePerTicket * ticketQuantity
+
+    // Use the ticket type name (not ID) for storage
+    const ticketTypeName = ticketTypeData.name || ticketType
 
     // Create ticket
     const { data: ticket, error: ticketError } = await supabase
@@ -44,7 +105,7 @@ export async function POST(request: NextRequest) {
         fullName,
         phoneNumber,
         email: email || null,
-        ticketType,
+        ticketType: ticketTypeName,
         quantity: ticketQuantity,
         totalAmount,
       })
