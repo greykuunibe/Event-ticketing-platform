@@ -2,10 +2,10 @@
 
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, Suspense } from 'react'
 import { SpinnerIcon } from '@phosphor-icons/react'
 
-export default function CallbackPage() {
+function CallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { data: session, status } = useSession()
@@ -33,6 +33,23 @@ export default function CallbackPage() {
         <p className="text-gray-600">Completing sign in...</p>
       </div>
     </div>
+  )
+}
+
+export default function CallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-stone-100 flex items-center justify-center">
+          <div className="text-center">
+            <SpinnerIcon size={48} className="animate-spin text-orange-600 mx-auto mb-4" />
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <CallbackContent />
+    </Suspense>
   )
 }
 

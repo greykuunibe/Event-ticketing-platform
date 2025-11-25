@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useNotification } from '@/hooks/useNotification'
 import PersonalInfoForm from '@/components/booking/PersonalInfoForm'
@@ -31,7 +31,7 @@ interface Event {
   location: string | null
 }
 
-export default function NewTicketPage() {
+function NewTicketContent() {
   const router = useRouter()
   const { error: showError, warning } = useNotification()
   const searchParams = useSearchParams()
@@ -511,6 +511,23 @@ export default function NewTicketPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function NewTicketPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-stone-100 flex items-center justify-center px-4">
+          <div className="bg-white border border-zinc-200 rounded-lg p-8 max-w-md w-full text-center">
+            <SpinnerIcon size={48} className="animate-spin text-orange-600 mx-auto mb-4" />
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <NewTicketContent />
+    </Suspense>
   )
 }
 

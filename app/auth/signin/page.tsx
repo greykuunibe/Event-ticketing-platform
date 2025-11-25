@@ -2,12 +2,12 @@
 
 import { signIn, useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { SpinnerIcon, TicketIcon } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 
-export default function SignInPage() {
+function SignInContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { data: session, status } = useSession()
@@ -118,3 +118,18 @@ export default function SignInPage() {
   )
 }
 
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-stone-100 flex items-center justify-center">
+          <div className="text-center">
+            <SpinnerIcon className="animate-spin text-orange-600" size={48} />
+          </div>
+        </div>
+      }
+    >
+      <SignInContent />
+    </Suspense>
+  )
+}

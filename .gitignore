@@ -1,1 +1,27 @@
 node_modules
+.env      # Environment variables
+.env.local # Local environment variables
+.env.development # Development environment variables
+.env.production # Production environment variables
+.env.test # Test environment variables
+.env.development.local # Local development environment variables
+.env.production.local # Local production environment variables
+.env.test.local # Local test environment variables
+.env.development.local.example # Local development environment variables example
+.env.production.local.example # Local production environment variables example
+.env.test.local.example # Local test environment variables example  
+
+.next/
+.turbo/
+.vercel/
+.vercel_build_output/
+.vercel_build_output_next/
+.vercel_build_output_next_16/
+.vercel_build_output_next_16_0/
+.vercel_build_output_next_16_0_4/
+.vercel_build_output_next_16_0_4_0/
+.vercel_build_output_next_16_0_4_0_0/
+.vercel_build_output_next_16_0_4_0_0_0/
+.vercel_build_output_next_16_0_4_0_0_0_0/
+
+
