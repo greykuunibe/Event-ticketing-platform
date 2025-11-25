@@ -15,23 +15,28 @@ interface TicketType {
 interface TicketTypeSelectionProps {
   selectedType: string | null
   onSelect: (type: string, price: number) => void
+  eventId?: string | null
 }
 
 export default function TicketTypeSelection({
   selectedType,
   onSelect,
+  eventId,
 }: TicketTypeSelectionProps) {
   const [ticketTypes, setTicketTypes] = useState<TicketType[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchTicketTypes()
-  }, [])
+    if (eventId) {
+      fetchTicketTypes()
+    }
+  }, [eventId])
 
   const fetchTicketTypes = async () => {
+    if (!eventId) return
     try {
       setLoading(true)
-      const response = await fetch('/api/ticket-types')
+      const response = await fetch(`/api/ticket-types?eventId=${eventId}`)
       if (!response.ok) throw new Error('Failed to fetch ticket types')
       const data = await response.json()
       setTicketTypes(data || [])

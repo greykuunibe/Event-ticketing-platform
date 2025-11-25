@@ -420,6 +420,7 @@ function NewTicketContent() {
                 <TicketTypeSelection
                   selectedType={selectedTicketType}
                   onSelect={handleTicketTypeSelect}
+                  eventId={event?.id}
                 />
                 {selectedTicketType && (
                   <div className="flex justify-end pt-4">
