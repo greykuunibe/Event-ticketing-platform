@@ -7,3 +7,7 @@
 
 [functions]
   node_bundler = "esbuild"
+
+# Exclude .env files from being scanned
+[build.environment]
+  SECRETS_SCAN_OMIT_PATHS = ".env,.env.local,.env.production,.netlify/**"

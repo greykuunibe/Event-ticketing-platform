@@ -10,9 +10,20 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Force middleware to use Node.js runtime instead of Edge
   experimental: {
     serverComponentsExternalPackages: ['@supabase/supabase-js'],
+  },
+  // Prevent .env files from being included in standalone output
+  output: 'standalone',
+  outputFileTracingExcludes: {
+    '*': [
+      '.env',
+      '.env.local',
+      '.env.development',
+      '.env.production',
+      '.env.test',
+      '.env*.local',
+    ],
   },
 };
 

@@ -25,4 +25,5 @@ node_modules
 .vercel_build_output_next_16_0_4_0_0_0/
 .vercel_build_output_next_16_0_4_0_0_0_0/
 
-
+# Netlify build directories
+.netlify/
