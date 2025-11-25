@@ -418,6 +418,7 @@ function NewTicketContent() {
                 className="space-y-6"
               >
                 <TicketTypeSelection
+                  key={event?.id || 'no-event'}
                   selectedType={selectedTicketType}
                   onSelect={handleTicketTypeSelect}
                   eventId={event?.id}

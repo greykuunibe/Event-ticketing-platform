@@ -29,19 +29,44 @@ export default function TicketTypeSelection({
   useEffect(() => {
     if (eventId) {
       fetchTicketTypes()
+    } else {
+      // Reset state if eventId is not available
+      setTicketTypes([])
+      setLoading(false)
     }
   }, [eventId])
 
   const fetchTicketTypes = async () => {
-    if (!eventId) return
+    if (!eventId) {
+      setLoading(false)
+      return
+    }
     try {
       setLoading(true)
-      const response = await fetch(`/api/ticket-types?eventId=${eventId}`)
-      if (!response.ok) throw new Error('Failed to fetch ticket types')
+      const url = `/api/ticket-types?eventId=${encodeURIComponent(eventId)}`
+      const response = await fetch(url, {
+        cache: 'no-store', // Prevent caching issues in production
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `Failed to fetch ticket types: ${response.status}`)
+      }
+      
       const data = await response.json()
-      setTicketTypes(data || [])
+      
+      // Handle both array and error response
+      if (Array.isArray(data)) {
+        setTicketTypes(data)
+      } else if (data.error) {
+        console.error('API Error:', data.error)
+        setTicketTypes([])
+      } else {
+        setTicketTypes([])
+      }
     } catch (error) {
       console.error('Error fetching ticket types:', error)
+      setTicketTypes([])
     } finally {
       setLoading(false)
     }
@@ -73,6 +98,16 @@ export default function TicketTypeSelection({
           b: parseInt(result[3], 16),
         }
       : null
+  }
+
+  if (!eventId) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12">
+          <p className="text-gray-500">Loading event information...</p>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
