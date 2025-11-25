@@ -16,7 +16,8 @@ export const initializePayment = async (
       amount: amount * 100, // Convert to kobo/pesewas
       reference,
       metadata,
-      callback_url: `${process.env.NEXT_PUBLIC_BASE_URL}/tickets/success/${reference}`,
+      // Use query parameter format since Paystack dashboard might override path-based URLs
+      callback_url: `${process.env.NEXT_PUBLIC_BASE_URL}/tickets/success?reference=${encodeURIComponent(reference)}`,
     })
 
     return response

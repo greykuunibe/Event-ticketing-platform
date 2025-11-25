@@ -166,12 +166,27 @@ export const authOptions: NextAuthOptions = {
         // Check if user exists in database by email (for Google OAuth)
         if (user.email && account?.provider === 'google') {
           try {
-            const { data: existingUser, error } = await supabase
+            // First try with deletedAt check
+            let { data: existingUser, error } = await supabase
               .from('users')
               .select('id')
               .eq('email', user.email)
               .is('deletedAt', null)
               .single()
+
+            // If that fails due to missing column, try without deletedAt check
+            if (error && error.code !== 'PGRST116') {
+              const retryQuery = await supabase
+                .from('users')
+                .select('id')
+                .eq('email', user.email)
+                .single()
+              
+              if (!retryQuery.error && retryQuery.data) {
+                existingUser = retryQuery.data
+                error = null
+              }
+            }
 
             // Only set token.id if user exists in database
             if (existingUser && !error) {
@@ -183,8 +198,8 @@ export const authOptions: NextAuthOptions = {
                 // This will cause callback page to redirect to signup
                 console.log('User not found in database, will redirect to signup:', user.email)
               } else {
-                // Other database errors (like missing column) - log but don't set id
-                console.error('Database error checking user:', error.message)
+                // Other database errors - log but don't set id
+                console.error('Database error checking user:', error.message, error.code)
                 // Don't set token.id so user gets redirected to signup
               }
             }

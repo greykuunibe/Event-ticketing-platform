@@ -223,12 +223,16 @@ function NewTicketContent() {
 
       const paymentData = await paymentResponse.json()
 
-      // Redirect to Paystack
+      // Redirect to Paystack - this MUST be the only action
+      // Do NOT show ticket before payment is confirmed
       if (paymentData.authorizationUrl) {
-        window.location.href = paymentData.authorizationUrl
+        // Use window.location.replace to prevent back button from showing ticket
+        window.location.replace(paymentData.authorizationUrl)
+        return // Exit function - don't execute anything after redirect
       }
 
-      router.push(`/tickets/success/${ticket.id}`)
+      // If no authorization URL, something went wrong
+      throw new Error('Payment initialization failed - no authorization URL received')
 
     } catch (error) {
       console.error('Error:', error)

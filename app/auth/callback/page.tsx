@@ -42,11 +42,38 @@ function CallbackContent() {
           router.replace(callbackUrl)
         }
       } else if (session.user?.email) {
-        // User authenticated via Google but doesn't exist in DB - redirect to signup
-        const googleId = (session as any).googleId || ''
-        router.replace(
-          `/auth/signup?email=${encodeURIComponent(session.user.email)}&callbackUrl=${encodeURIComponent(callbackUrl)}&message=${encodeURIComponent('Your account is not registered. Please complete your sign up.')}${googleId ? `&id=${encodeURIComponent(googleId)}` : ''}`
-        )
+        // User authenticated but doesn't have ID - verify if they actually exist in DB
+        // This handles cases where JWT callback might have failed to set the ID
+        const checkUserExists = async () => {
+          const userEmail = session.user?.email
+          if (!userEmail) {
+            router.replace(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}&error=missing_email`)
+            return
+          }
+          
+          try {
+            const checkResponse = await fetch(`/api/auth/check-user?email=${encodeURIComponent(userEmail)}`)
+            if (checkResponse.ok) {
+              const checkData = await checkResponse.json()
+              if (checkData.exists && checkData.userId) {
+                // User actually exists - redirect to signin (they need to use password)
+                router.replace(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}&error=${encodeURIComponent('Please sign in with your password.')}`)
+                return
+              }
+            }
+          } catch (checkError) {
+            console.error('Error checking user existence:', checkError)
+            // Continue to signup redirect if check fails
+          }
+          
+          // User authenticated via Google but doesn't exist in DB - redirect to signup
+          const googleId = (session as any).googleId || ''
+          router.replace(
+            `/auth/signup?email=${encodeURIComponent(userEmail)}&callbackUrl=${encodeURIComponent(callbackUrl)}&message=${encodeURIComponent('Your account is not registered. Please complete your sign up.')}${googleId ? `&id=${encodeURIComponent(googleId)}` : ''}`
+          )
+        }
+        
+        checkUserExists()
       } else {
         // No email - something went wrong, redirect to signin
         router.replace(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}&error=missing_email`)

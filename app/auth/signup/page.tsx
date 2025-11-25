@@ -95,6 +95,11 @@ function SignUpContent() {
       const data = await response.json()
 
       if (!response.ok) {
+        // If user already exists, redirect to signin
+        if (data.error && (data.error.includes('already exists') || data.error.includes('User already exists'))) {
+          router.replace(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}&error=${encodeURIComponent(data.error)}`)
+          return
+        }
         setError(data.error || 'Failed to create account')
         setLoading(false)
         return

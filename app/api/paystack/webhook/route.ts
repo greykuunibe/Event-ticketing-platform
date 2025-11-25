@@ -11,9 +11,10 @@ export async function GET(request: NextRequest) {
     const reference = searchParams.get('reference') || searchParams.get('trxref')
     
     if (reference) {
-      // Redirect to success page with the payment reference
+      // Redirect to success page with the payment reference in the path
+      // This ensures the success page can find the ticket
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin
-      return NextResponse.redirect(`${baseUrl}/tickets/success/${reference}`)
+      return NextResponse.redirect(`${baseUrl}/tickets/success/${encodeURIComponent(reference)}`)
     }
     
     // If no reference, redirect to home
