@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Force middleware to use Node.js runtime instead of Edge
+  experimental: {
+    serverComponentsExternalPackages: ['@supabase/supabase-js'],
+  },
 };
 
 export default nextConfig;
