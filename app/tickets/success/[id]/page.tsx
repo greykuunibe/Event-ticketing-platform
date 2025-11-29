@@ -5,23 +5,6 @@ import { useParams, useSearchParams } from 'next/navigation'
 import TicketDisplay from '@/components/ticket/TicketDisplay'
 import { BeerBottleIcon } from '@phosphor-icons/react'
 
-// Helper to check if we're in test mode
-function isTestMode(): boolean {
-  // Check environment variable first
-  if (process.env.NEXT_PUBLIC_PAYSTACK_TEST_MODE === 'true') {
-    return true
-  }
-  
-  // Check if we're on localhost
-  if (typeof window !== 'undefined' && window.location.hostname.includes('localhost')) {
-    return true
-  }
-  
-  // In production, we'll rely on the environment variable being set
-  // This prevents accidental bypass in production
-  return false
-}
-
 interface Ticket {
   id: string
   fullName: string
@@ -77,18 +60,11 @@ function TicketSuccessPageContent() {
         console.log('Found ticket:', foundTicket ? 'Yes' : 'No')
 
         if (foundTicket) {
-          const testMode = isTestMode()
-          
-          // Only show ticket if payment is confirmed OR we're in test mode
-          if (foundTicket.paymentStatus !== 'paid' && !testMode) {
+          // Only show ticket if payment is confirmed
+          if (foundTicket.paymentStatus !== 'paid') {
             setError('Payment not confirmed. Please wait for payment confirmation or contact support.')
             setLoading(false)
             return
-          }
-          
-          // In test mode, show a warning that payment isn't confirmed
-          if (foundTicket.paymentStatus !== 'paid' && testMode) {
-            console.warn('Test mode: Showing ticket without payment confirmation')
           }
 
           // Transform ticket_items to items format
@@ -106,18 +82,11 @@ function TicketSuccessPageContent() {
           if (directResponse.ok) {
             const directTicket: any = await directResponse.json()
             
-            const testMode = isTestMode()
-            
-            // Only show ticket if payment is confirmed OR we're in test mode
-            if (directTicket.paymentStatus !== 'paid' && !testMode) {
+            // Only show ticket if payment is confirmed
+            if (directTicket.paymentStatus !== 'paid') {
               setError('Payment not confirmed. Please wait for payment confirmation or contact support.')
               setLoading(false)
               return
-            }
-            
-            // In test mode, show a warning that payment isn't confirmed
-            if (directTicket.paymentStatus !== 'paid' && testMode) {
-              console.warn('Test mode: Showing ticket without payment confirmation')
             }
 
             // Transform ticket_items to items format
@@ -168,24 +137,13 @@ function TicketSuccessPageContent() {
     )
   }
 
-  // Check if we're in test mode
-  const testMode = isTestMode()
-  const isUnpaidInTestMode = ticket.paymentStatus !== 'paid' && testMode
-
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {isUnpaidInTestMode ? 'Test Mode - Ticket Preview' : 'Payment Successful!'}
+            Payment Successful!
           </h1>
-          {isUnpaidInTestMode && (
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-yellow-800 text-sm font-medium">
-                ⚠️ Test Mode: Payment not confirmed. This ticket is shown for testing purposes only.
-              </p>
-            </div>
-          )}
           <p className="mb-6">
             Download ticket as PNG.
           </p>

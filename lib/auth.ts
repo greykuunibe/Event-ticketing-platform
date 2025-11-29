@@ -27,7 +27,30 @@ export const authOptions: NextAuthOptions = {
             .eq('email', credentials.email)
             .single()
 
-          if (error || !user) {
+          // Check for database connection errors
+          if (error) {
+            // Database connection or query errors
+            if (error.code === 'PGRST116') {
+              // User not found - this is an authentication error, not a connection error
+              throw new Error('Invalid email or password')
+            }
+            
+            // Network or connection errors
+            if (error.message?.includes('fetch') || 
+                error.message?.includes('network') || 
+                error.message?.includes('connection') ||
+                error.code?.includes('ECONNREFUSED') ||
+                error.code?.includes('ETIMEDOUT')) {
+              console.error('Database connection error:', error)
+              throw new Error('DATABASE_CONNECTION_ERROR')
+            }
+            
+            // Other database errors
+            console.error('Database query error:', error)
+            throw new Error('Invalid email or password')
+          }
+
+          if (!user) {
             throw new Error('Invalid email or password')
           }
 
@@ -56,6 +79,13 @@ export const authOptions: NextAuthOptions = {
           }
         } catch (error: any) {
           console.error('Credentials authorization error:', error)
+          
+          // If it's a database connection error, throw a specific error
+          if (error.message === 'DATABASE_CONNECTION_ERROR') {
+            throw new Error('DATABASE_CONNECTION_ERROR')
+          }
+          
+          // For other errors, throw the original message or a generic auth error
           throw new Error(error.message || 'Invalid email or password')
         }
       },

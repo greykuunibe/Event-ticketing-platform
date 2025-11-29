@@ -25,12 +25,25 @@ function SignInContent() {
   useEffect(() => {
     const errorParam = searchParams.get('error')
     if (errorParam) {
-      if (errorParam === 'CredentialsSignin') {
+      // Decode the error message if it's URL encoded
+      const decodedError = decodeURIComponent(errorParam)
+      
+      if (errorParam === 'CredentialsSignin' || decodedError === 'CredentialsSignin') {
         setError('Invalid email or password')
+      } else if (decodedError.includes('DATABASE_CONNECTION_ERROR') || 
+                 decodedError.includes('Database connection') ||
+                 decodedError.includes('database connection')) {
+        setError('Database connection failed. Please check your connection and try again.')
+      } else if (decodedError.includes('Account has been deleted')) {
+        setError('This account has been deleted. Please contact support.')
+      } else if (decodedError.includes('Password not set')) {
+        setError(decodedError)
       } else {
-        setError('Authentication failed. Please check your database connection and try again.')
+        // Show the actual error message if available, otherwise show generic message
+        const errorMessage = decodedError !== errorParam ? decodedError : 'Invalid email or password'
+        setError(errorMessage)
       }
-      console.error('Auth error:', errorParam)
+      console.error('Auth error:', errorParam, 'Decoded:', decodedError)
     }
   }, [searchParams])
 
@@ -90,7 +103,19 @@ function SignInContent() {
       })
 
       if (result?.error) {
-        setError('Invalid email or password')
+        // Check if it's a database connection error
+        const errorMessage = result.error
+        if (errorMessage.includes('DATABASE_CONNECTION_ERROR') || 
+            errorMessage.includes('Database connection') ||
+            errorMessage.includes('database connection')) {
+          setError('Database connection failed. Please check your connection and try again.')
+        } else if (errorMessage.includes('Account has been deleted')) {
+          setError('This account has been deleted. Please contact support.')
+        } else if (errorMessage.includes('Password not set')) {
+          setError(errorMessage)
+        } else {
+          setError('Invalid email or password')
+        }
         setLoading(false)
         return
       }
@@ -187,7 +212,7 @@ function SignInContent() {
             whileHover={{ scale: 1.02 }}
             transition={{ type: "spring", stiffness: 400, damping: 17 }}
             disabled={loading || !formData.email || !formData.password}
-            className="flex items-center justify-center gap-2 w-full bg-gradient-to-br from-zinc-900 to-zinc-700 border border-zinc-200 text-center text-white px-4 py-2 rounded-xl active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex items-center justify-center gap-2 w-full bg-linear-to-br from-zinc-900 to-zinc-700 border border-zinc-200 text-center text-white px-4 py-2 rounded-xl active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? (
               <>
