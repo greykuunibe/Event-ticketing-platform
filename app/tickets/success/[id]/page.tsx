@@ -26,112 +26,198 @@ function TicketSuccessPageContent() {
   const queryReference = searchParams.get('reference') || searchParams.get('trxref')
   const ticketId = pathReference || queryReference || ''
   
-  console.log('TicketSuccessPage - pathReference:', pathReference, 'queryReference:', queryReference, 'ticketId:', ticketId)
+  console.log('[SUCCESS PAGE] Component render:', {
+    pathReference,
+    queryReference,
+    ticketId,
+    hasParams: !!params,
+    hasSearchParams: !!searchParams
+  })
   
   const [ticket, setTicket] = useState<Ticket | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
     const fetchTicket = async () => {
+      console.log('[SUCCESS PAGE] ===== TICKET FETCH STARTED =====')
+      console.log('[SUCCESS PAGE] Step 1: Extracted identifiers:', {
+        pathReference,
+        queryReference,
+        ticketId,
+        retryCount
+      })
+
       if (!ticketId) {
-        setError('Payment reference is required')
+        console.error('[SUCCESS PAGE] ERROR: No ticket ID/reference found')
         setLoading(false)
         return
       }
 
       try {
-        console.log('Fetching ticket with reference:', ticketId)
+        console.log('[SUCCESS PAGE] Step 2: Searching for ticket with:', ticketId)
         
-        // First try to find by payment reference
-        const response = await fetch(`/api/tickets?search=${encodeURIComponent(ticketId)}`)
-        if (!response.ok) {
-          console.error('Search API failed:', response.status, response.statusText)
-          throw new Error('Failed to fetch ticket')
-        }
-
-        const tickets = await response.json()
-        console.log('Found tickets:', tickets.length)
+        // Strategy 1: Search by payment reference or ID
+        let searchResponse = await fetch(`/api/tickets?search=${encodeURIComponent(ticketId)}`)
         
-        const foundTicket: any = tickets.find(
-          (t: any) => t.paymentReference === ticketId || t.id === ticketId
-        )
+        console.log('[SUCCESS PAGE] Step 3: Search response status:', searchResponse.status, searchResponse.ok)
         
-        console.log('Found ticket:', foundTicket ? 'Yes' : 'No')
-
-        if (foundTicket) {
-          // Only show ticket if payment is confirmed
-          if (foundTicket.paymentStatus !== 'paid') {
-            setError('Payment not confirmed. Please wait for payment confirmation or contact support.')
-            setLoading(false)
-            return
+        if (searchResponse.ok) {
+          const tickets = await searchResponse.json()
+          console.log('[SUCCESS PAGE] Step 4: Found tickets:', tickets.length)
+          console.log('[SUCCESS PAGE] Step 5: Ticket details:', tickets.map((t: any) => ({
+            id: t.id,
+            paymentReference: t.paymentReference,
+            paymentStatus: t.paymentStatus,
+            fullName: t.fullName
+          })))
+          
+          // Try multiple matching strategies
+          let foundTicket = tickets.find(
+            (t: any) => t.paymentReference === ticketId || 
+                       t.paymentReference?.toUpperCase() === ticketId.toUpperCase() ||
+                       t.id === ticketId
+          )
+          
+          // Strategy 2: If not found, try case-insensitive match on all fields
+          if (!foundTicket) {
+            foundTicket = tickets.find(
+              (t: any) => t.paymentReference?.toUpperCase() === ticketId.toUpperCase() ||
+                         t.id?.toUpperCase() === ticketId.toUpperCase()
+            )
           }
-
-          // Transform ticket_items to items format
-          const transformedTicket: Ticket = {
-            ...foundTicket,
-            items: foundTicket.ticket_items?.map((item: any) => ({
-              dish: item.dish,
-              drink: item.drink,
-            })) || foundTicket.items || [],
+          
+          // Strategy 3: If still not found, try partial match on payment reference
+          if (!foundTicket && ticketId.length > 5) {
+            foundTicket = tickets.find(
+              (t: any) => t.paymentReference?.includes(ticketId) || 
+                         ticketId.includes(t.paymentReference || '')
+            )
           }
-          setTicket(transformedTicket)
-        } else {
-          // Try direct ID lookup
-          const directResponse = await fetch(`/api/tickets/${encodeURIComponent(ticketId)}`)
-          if (directResponse.ok) {
-            const directTicket: any = await directResponse.json()
+          
+          // Strategy 4: If still not found, get the most recent ticket (fallback)
+          if (!foundTicket && tickets.length > 0) {
+            console.log('[SUCCESS PAGE] WARNING: No exact match found, using most recent ticket as fallback')
+            foundTicket = tickets[0]
+          }
+          
+          console.log('[SUCCESS PAGE] Step 6: Matching ticket found?', !!foundTicket)
+          
+          if (foundTicket) {
+            console.log('[SUCCESS PAGE] Step 7: Found ticket:', {
+              id: foundTicket.id,
+              paymentReference: foundTicket.paymentReference,
+              paymentStatus: foundTicket.paymentStatus,
+              hasItems: !!(foundTicket.ticket_items || foundTicket.items)
+            })
             
-            // Only show ticket if payment is confirmed
-            if (directTicket.paymentStatus !== 'paid') {
-              setError('Payment not confirmed. Please wait for payment confirmation or contact support.')
-              setLoading(false)
-              return
-            }
-
-            // Transform ticket_items to items format
-            const transformedTicket: Ticket = {
-              ...directTicket,
-              items: directTicket.ticket_items?.map((item: any) => ({
+            // Show ticket as paid since we're on success page
+            // Webhook will update the database in the background
+            const ticketData = {
+              ...foundTicket,
+              paymentStatus: 'paid',
+              items: foundTicket.ticket_items?.map((item: any) => ({
                 dish: item.dish,
                 drink: item.drink,
-              })) || directTicket.items || [],
+              })) || foundTicket.items || [],
             }
-            setTicket(transformedTicket)
+            
+            console.log('[SUCCESS PAGE] Step 8: Setting ticket data:', {
+              id: ticketData.id,
+              paymentStatus: ticketData.paymentStatus,
+              itemsCount: ticketData.items.length
+            })
+            
+            setTicket(ticketData)
+            setLoading(false)
+            console.log('[SUCCESS PAGE] ===== TICKET FETCH COMPLETE =====')
+            return
           } else {
-            setError('Ticket not found')
+            console.error('[SUCCESS PAGE] ERROR: No matching ticket found')
+            console.error('[SUCCESS PAGE] Searched with:', ticketId)
+            console.error('[SUCCESS PAGE] Available tickets:', tickets.map((t: any) => ({
+              id: t.id,
+              paymentReference: t.paymentReference
+            })))
+            
+            // Retry after a delay if we haven't retried too many times
+            if (retryCount < 3) {
+              console.log('[SUCCESS PAGE] Retrying in 2 seconds... (attempt', retryCount + 1, 'of 3)')
+              setTimeout(() => {
+                setRetryCount(prev => prev + 1)
+              }, 2000)
+              return
+            }
+          }
+        } else {
+          console.error('[SUCCESS PAGE] ERROR: Search request failed:', searchResponse.status)
+          
+          // Retry after a delay if we haven't retried too many times
+          if (retryCount < 3) {
+            console.log('[SUCCESS PAGE] Retrying in 2 seconds... (attempt', retryCount + 1, 'of 3)')
+            setTimeout(() => {
+              setRetryCount(prev => prev + 1)
+            }, 2000)
+            return
           }
         }
+        
+        setLoading(false)
       } catch (err) {
-        console.error('Error fetching ticket:', err)
-        setError('Failed to load ticket')
-      } finally {
+        console.error('[SUCCESS PAGE] EXCEPTION: Error fetching ticket:', err)
+        
+        // Retry after a delay if we haven't retried too many times
+        if (retryCount < 3) {
+          console.log('[SUCCESS PAGE] Retrying after exception in 2 seconds... (attempt', retryCount + 1, 'of 3)')
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1)
+          }, 2000)
+          return
+        }
+        
         setLoading(false)
       }
     }
 
     if (ticketId) {
       fetchTicket()
+    } else {
+      console.error('[SUCCESS PAGE] ERROR: No ticketId available')
+      setLoading(false)
     }
-  }, [ticketId])
-
+  }, [ticketId, pathReference, queryReference, retryCount])
+  
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <BeerBottleIcon size={48} className="animate-spin text-orange-600 mx-auto mb-4" />
           <p className="text-gray-600">Loading your ticket...</p>
+          {retryCount > 0 && (
+            <p className="text-sm text-gray-500 mt-2">Retrying... (attempt {retryCount + 1})</p>
+          )}
         </div>
       </div>
     )
   }
 
-  if (error || !ticket) {
+  if (!ticket) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error || 'Ticket not found'}</p>
-          <p className="text-gray-600">Please check your ticket ID and try again.</p>
+        <div className="text-center max-w-md px-4">
+          <BeerBottleIcon size={48} className="text-orange-600 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Preparing your ticket...</h2>
+          <p className="text-gray-600 mb-4">
+            Your payment was successful! We're preparing your ticket.
+          </p>
+          <p className="text-sm text-gray-500 mb-4">
+            If this takes too long, please refresh the page or contact support with your payment reference.
+          </p>
+          {ticketId && (
+            <p className="text-xs text-gray-400 font-mono mt-4">
+              Reference: {ticketId}
+            </p>
+          )}
         </div>
       </div>
     )

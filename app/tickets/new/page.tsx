@@ -152,10 +152,16 @@ function NewTicketContent() {
   }
 
   const handleProceedToPayment = async () => {
+    console.log('[FRONTEND] ===== STARTING TICKET PURCHASE FLOW =====')
+    console.log('[FRONTEND] Step 1: Validating form data')
+    
     if (!event) {
+      console.error('[FRONTEND] ERROR: Event not found')
       showError('Event not found. Please scan a valid QR code.')
       return
     }
+
+    console.log('[FRONTEND] Step 2: Event found:', event.id, event.name)
 
     // Validate all items have dish and drink
     const isValid = ticketItems.every(
@@ -163,12 +169,16 @@ function NewTicketContent() {
     )
 
     if (!isValid) {
+      console.error('[FRONTEND] ERROR: Invalid items - missing dish or drink')
       warning('Please select dish and drink for all selections')
       return
     }
 
+    console.log('[FRONTEND] Step 3: Items validated:', ticketItems.length, 'items')
+
     // Validate ticket type is selected
     if (!selectedTicketType) {
+      console.error('[FRONTEND] ERROR: No ticket type selected')
       showError('Please select a ticket type')
       setIsLoading(false)
       return
@@ -179,13 +189,23 @@ function NewTicketContent() {
     const ticketTypeToSend = ticketTypeName || selectedTicketType // Use name if available, otherwise send ID
 
     if (!ticketTypeToSend || ticketTypeToSend.trim() === '') {
+      console.error('[FRONTEND] ERROR: Invalid ticket type')
       showError('Invalid ticket type. Please try selecting again.')
       setIsLoading(false)
       return
     }
 
+    console.log('[FRONTEND] Step 4: Ticket type selected:', ticketTypeToSend)
+    console.log('[FRONTEND] Step 5: Personal info:', {
+      fullName: personalInfo!.fullName,
+      phoneNumber: personalInfo!.phoneNumber,
+      email: personalInfo!.email,
+      quantity
+    })
+
     setIsLoading(true)
     try {
+      console.log('[FRONTEND] Step 6: Creating ticket via API...')
       // Create ticket
       const ticketResponse = await fetch('/api/tickets', {
         method: 'POST',
@@ -201,12 +221,23 @@ function NewTicketContent() {
         }),
       })
 
+      console.log('[FRONTEND] Step 7: Ticket creation response status:', ticketResponse.status, ticketResponse.ok)
+
       if (!ticketResponse.ok) {
+        const errorData = await ticketResponse.json().catch(() => ({}))
+        console.error('[FRONTEND] ERROR: Ticket creation failed:', errorData)
         throw new Error('Failed to create ticket')
       }
 
       const ticket = await ticketResponse.json()
+      console.log('[FRONTEND] Step 8: Ticket created successfully:', {
+        ticketId: ticket.id,
+        paymentStatus: ticket.paymentStatus,
+        totalAmount: ticket.totalAmount,
+        paymentReference: ticket.paymentReference
+      })
 
+      console.log('[FRONTEND] Step 9: Initializing payment with Paystack...')
       // Initialize payment
       const paymentResponse = await fetch('/api/paystack/initialize', {
         method: 'POST',
@@ -217,25 +248,35 @@ function NewTicketContent() {
         }),
       })
 
+      console.log('[FRONTEND] Step 10: Payment initialization response status:', paymentResponse.status, paymentResponse.ok)
+
       if (!paymentResponse.ok) {
+        const errorData = await paymentResponse.json().catch(() => ({}))
+        console.error('[FRONTEND] ERROR: Payment initialization failed:', errorData)
         throw new Error('Failed to initialize payment')
       }
 
       const paymentData = await paymentResponse.json()
+      console.log('[FRONTEND] Step 11: Payment initialized successfully:', {
+        reference: paymentData.reference,
+        hasAuthorizationUrl: !!paymentData.authorizationUrl
+      })
 
       // Redirect to Paystack - this MUST be the only action
       // Do NOT show ticket before payment is confirmed
       if (paymentData.authorizationUrl) {
+        console.log('[FRONTEND] Step 12: Redirecting to Paystack:', paymentData.authorizationUrl)
         // Use window.location.replace to prevent back button from showing ticket
         window.location.replace(paymentData.authorizationUrl)
         return // Exit function - don't execute anything after redirect
       }
 
       // If no authorization URL, something went wrong
+      console.error('[FRONTEND] ERROR: No authorization URL received')
       throw new Error('Payment initialization failed - no authorization URL received')
 
     } catch (error) {
-      console.error('Error:', error)
+      console.error('[FRONTEND] ERROR in purchase flow:', error)
       showError('An error occurred. Please try again.')
       setIsLoading(false)
     }

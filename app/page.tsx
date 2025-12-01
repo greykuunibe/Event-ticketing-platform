@@ -23,7 +23,7 @@ export default function Home() {
           >
             <Link 
               href="/auth/signin?callbackUrl=/admin/dashboard" 
-              className='flex items-center justify-center gap-2 w-full bg-gradient-to-br from-zinc-900 to-zinc-700 border border-zinc-200 text-center text-white px-4 py-2 rounded-xl active:opacity-80'
+              className='flex items-center justify-center gap-2 w-full bg-linear-to-br from-zinc-900 to-zinc-700 border border-zinc-200 text-center text-white px-4 py-2 rounded-xl active:opacity-80'
             > 
               <TicketIcon size={20} weight="fill" /> Login to your account
             </Link>

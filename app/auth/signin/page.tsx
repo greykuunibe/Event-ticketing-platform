@@ -47,21 +47,45 @@ function SignInContent() {
     }
   }, [searchParams])
 
+  // Track if we've already attempted a redirect to prevent loops
+  const hasRedirectedRef = useRef(false)
+  
   // Redirect if already authenticated AND user exists in database
   useEffect(() => {
+    // Prevent redirect loops - only redirect once
+    if (status === 'loading' || hasRedirectedRef.current) {
+      return
+    }
+    
+    const currentPath = window.location.pathname
+    
+    // Don't redirect if we're already on an auth page (except during active sign-in)
+    if (currentPath.includes('/auth/') && !isRedirecting) {
+      return
+    }
+    
     if (isRedirecting && status === 'authenticated' && session?.user?.id) {
       // Session has updated after sign-in, redirect to callback
+      hasRedirectedRef.current = true
       router.replace(`/auth/callback?callbackUrl=${encodeURIComponent(callbackUrl)}`)
       setIsRedirecting(false)
       setLoading(false)
     } else if (status === 'authenticated' && session?.user?.id && !isRedirecting) {
       // Already authenticated (not from current sign-in) - redirect directly
-      router.push(callbackUrl)
+      // Only redirect if we're not already on the target page or an auth page
+      if (!currentPath.startsWith(callbackUrl) && !currentPath.includes('/auth/')) {
+        hasRedirectedRef.current = true
+        router.push(callbackUrl)
+      }
     } else if (status === 'authenticated' && session?.user?.email && !session?.user?.id) {
       // User authenticated but doesn't exist in DB - redirect to signup
-      router.replace(
-        `/auth/signup?email=${encodeURIComponent(session.user.email)}&callbackUrl=${encodeURIComponent(callbackUrl)}&message=${encodeURIComponent('Your account is not registered. Please complete your sign up.')}`
-      )
+      // Only redirect if we're not already on signup page
+      if (!currentPath.includes('/auth/signup')) {
+        hasRedirectedRef.current = true
+        router.replace(
+          `/auth/signup?email=${encodeURIComponent(session.user.email)}&callbackUrl=${encodeURIComponent(callbackUrl)}&message=${encodeURIComponent('Your account is not registered. Please complete your sign up.')}`
+        )
+      }
     }
   }, [status, session, router, callbackUrl, isRedirecting])
   

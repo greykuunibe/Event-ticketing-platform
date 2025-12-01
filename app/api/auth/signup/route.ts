@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import bcrypt from 'bcryptjs'
+import { randomUUID } from 'crypto'
 
 export async function POST(request: NextRequest) {
   try {
@@ -96,11 +97,21 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
+    // Generate user ID
+    const userId = googleId || randomUUID()
+    
+    console.log('Creating user with:', {
+      email,
+      userId,
+      hasGoogleId: !!googleId,
+      name: name || email.split('@')[0]
+    })
+
     // Create user
     const { data: user, error: createError } = await supabase
       .from('users')
       .insert({
-        id: googleId || crypto.randomUUID(),
+        id: userId,
         email,
         name: name || email.split('@')[0],
         password: hashedPassword,
@@ -145,10 +156,13 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('Error in signup:', error)
+    console.error('Error stack:', error.stack)
+    console.error('Error name:', error.name)
     return NextResponse.json(
       { 
         error: 'Internal server error',
-        details: error.message 
+        details: error.message || 'Unknown error',
+        ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
       },
       { status: 500 }
     )

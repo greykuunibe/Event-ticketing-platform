@@ -24,6 +24,7 @@ function SignUpContent() {
   const [isInitializing, setIsInitializing] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [hasCheckedUser, setHasCheckedUser] = useState(false)
   const callbackUrl = searchParams.get('callbackUrl') || '/admin/dashboard'
   const email = searchParams.get('email')
   const id = searchParams.get('id')
@@ -41,13 +42,41 @@ function SignUpContent() {
           setFormData(prev => ({ ...prev, name: email.split('@')[0] }))
         }
       }
+      
+      // Only check once if user already exists (for non-Google signups)
+      // For Google signups, the callback page already checked, so we trust it
+      if (!hasCheckedUser && !id) {
+        setHasCheckedUser(true)
+        const verifyUserDoesNotExist = async () => {
+          try {
+            const checkResponse = await fetch(`/api/auth/check-user?email=${encodeURIComponent(email)}`)
+            if (checkResponse.ok) {
+              const checkData = await checkResponse.json()
+              if (checkData.exists) {
+                // User actually exists - redirect to signin immediately
+                // Only redirect if not already on signin page to prevent loops
+                if (!window.location.pathname.includes('/auth/signin')) {
+                  console.log('User exists, redirecting to signin from signup page')
+                  router.replace(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}&error=${encodeURIComponent('An account with this email already exists. Please sign in with your password.')}`)
+                }
+                return
+              }
+            }
+          } catch (checkError) {
+            console.error('Error verifying user existence on signup page:', checkError)
+            // Continue with signup if check fails
+          }
+        }
+        
+        verifyUserDoesNotExist()
+      }
     }
     if (message) {
       setError(message)
     }
     // Mark initialization as complete
     setIsInitializing(false)
-  }, [email, id, formData.name, message])
+  }, [email, id, formData.name, message, callbackUrl, router, hasCheckedUser])
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -95,12 +124,19 @@ function SignUpContent() {
       const data = await response.json()
 
       if (!response.ok) {
-        // If user already exists, redirect to signin
+        console.error('Signup error:', data)
+        // If user already exists, redirect to signin immediately
         if (data.error && (data.error.includes('already exists') || data.error.includes('User already exists'))) {
-          router.replace(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}&error=${encodeURIComponent(data.error)}`)
+          // Clear any error state and redirect
+          setError(null)
+          setLoading(false)
+          // Use replace to prevent back button issues
+          router.replace(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}&error=${encodeURIComponent('An account with this email already exists. Please sign in with your password.')}`)
           return
         }
-        setError(data.error || 'Failed to create account')
+        // Show detailed error message for other errors
+        const errorMessage = data.error || data.details || 'Failed to create account'
+        setError(errorMessage)
         setLoading(false)
         return
       }
