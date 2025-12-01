@@ -21,7 +21,8 @@ async function checkUser(email: string) {
         .single()
       
       if (!retryQuery.error && retryQuery.data) {
-        user = retryQuery.data
+        // Cast to include deletedAt as optional/null
+        user = { ...retryQuery.data, deletedAt: null } as typeof user
         error = null
       } else if (retryQuery.error && retryQuery.error.code === 'PGRST116') {
         // User doesn't exist
