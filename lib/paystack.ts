@@ -11,12 +11,15 @@ export const initializePayment = async (
   metadata?: Record<string, any>
 ) => {
   try {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://event-ticketing-platform.netlify.app'
+    const callbackUrl = `${baseUrl}/tickets/success?reference=${encodeURIComponent(reference)}`
+    
     console.log('[PAYSTACK LIB] Initializing payment:', {
       email,
       amount,
       amountInKobo: amount * 0.1,
       reference,
-      callbackUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/tickets/success/reference=${encodeURIComponent(reference)}`
+      callbackUrl
     })
 
     const response = await paystack.transaction.initialize({
@@ -24,8 +27,7 @@ export const initializePayment = async (
       amount: amount * 0.1, // Convert to kobo/pesewas
       reference,
       metadata,
-      // Use query parameter format since Paystack dashboard might override path-based URLs
-      callback_url: `${process.env.NEXT_PUBLIC_BASE_URL}/tickets/success/reference=${encodeURIComponent(reference)}`,
+      callback_url: callbackUrl,
     })
 
     console.log('[PAYSTACK LIB] Payment initialization response:', {
