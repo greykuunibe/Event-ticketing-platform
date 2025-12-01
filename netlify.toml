@@ -11,3 +11,8 @@
 # Exclude .env files from being scanned
 [build.environment]
   SECRETS_SCAN_OMIT_PATHS = ".env,.env.local,.env.production,.netlify/**"
+  # Exclude public environment variables from secrets scanning
+  # These are public URLs, not secrets:
+  # - NEXT_PUBLIC_* variables are intentionally exposed to client-side code
+  # - NEXTAUTH_URL is a public callback URL
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_BASE_URL,NEXTAUTH_URL"
