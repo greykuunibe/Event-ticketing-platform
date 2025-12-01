@@ -1,4 +1,3 @@
-import 'server-only'
 import Paystack from '@paystack/paystack-sdk'
 
 const paystack = new Paystack(process.env.PAYSTACK_SECRET_KEY || '')
@@ -13,7 +12,7 @@ export const initializePayment = async (
 ) => {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://event-ticketing-platform.netlify.app'
-    const callbackUrl = `${baseUrl}/tickets/success?reference=${encodeURIComponent(reference)}`
+    const callbackUrl = `${baseUrl}/tickets/success/${encodeURIComponent(reference)}`
     
     console.log('[PAYSTACK LIB] Initializing payment:', {
       email,
