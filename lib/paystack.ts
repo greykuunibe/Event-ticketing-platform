@@ -1,6 +1,11 @@
 import Paystack from '@paystack/paystack-sdk'
+import { getOptionalServerEnv, getServerEnv } from './env'
 
-const paystack = new Paystack(process.env.PAYSTACK_SECRET_KEY || '')
+const paystack = new Paystack(getServerEnv('PAYSTACK_SECRET_KEY'))
+const PUBLIC_BASE_URL = getOptionalServerEnv(
+  'NEXT_PUBLIC_BASE_URL',
+  'https://event-ticketing-platform.netlify.app'
+) ?? 'https://event-ticketing-platform.netlify.app'
 
 export default paystack
 
@@ -11,7 +16,7 @@ export const initializePayment = async (
   metadata?: Record<string, any>
 ) => {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://event-ticketing-platform.netlify.app'
+    const baseUrl = PUBLIC_BASE_URL
     const callbackUrl = `${baseUrl}/tickets/success/${encodeURIComponent(reference)}`
     
     console.log('[PAYSTACK LIB] Initializing payment:', {
