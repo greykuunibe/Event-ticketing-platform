@@ -4,9 +4,15 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import { supabase } from './supabase'
 import { verifyUserExists } from './auth-helpers'
 import bcrypt from 'bcryptjs'
+import { getOptionalServerEnv, getServerEnv } from './env'
+
+const NEXTAUTH_SECRET = getServerEnv('NEXTAUTH_SECRET')
+const GOOGLE_CLIENT_ID = getServerEnv('GOOGLE_CLIENT_ID')
+const GOOGLE_CLIENT_SECRET = getServerEnv('GOOGLE_CLIENT_SECRET')
+const DEFAULT_BASE_URL = getOptionalServerEnv('NEXTAUTH_URL', 'http://localhost:3000') ?? 'http://localhost:3000'
 
 export const authOptions: NextAuthOptions = {
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: NEXTAUTH_SECRET,
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -91,8 +97,8 @@ export const authOptions: NextAuthOptions = {
       },
     }),
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: GOOGLE_CLIENT_ID,
+      clientSecret: GOOGLE_CLIENT_SECRET,
     }),
   ],
   callbacks: {
@@ -280,7 +286,7 @@ export const authOptions: NextAuthOptions = {
     async redirect({ url, baseUrl }) {
       // Ensure baseUrl is valid
       if (!baseUrl) {
-        baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+        baseUrl = DEFAULT_BASE_URL
       }
 
       // If the URL is the callback page, allow it (handle both relative and absolute)

@@ -1,6 +1,11 @@
 import { Resend } from 'resend'
+import { getOptionalServerEnv, getServerEnv } from './env'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+const resend = new Resend(getServerEnv('RESEND_API_KEY'))
+const PUBLIC_BASE_URL = getOptionalServerEnv(
+  'NEXT_PUBLIC_BASE_URL',
+  'https://event-ticketing-platform.netlify.app'
+) ?? 'https://event-ticketing-platform.netlify.app'
 
 export const sendTicketEmail = async (
   email: string,
@@ -59,7 +64,7 @@ export const sendTicketEmail = async (
               </table>
             </div>
             
-            <p>You can also view and download your ticket at: <a href="${process.env.NEXT_PUBLIC_BASE_URL}/tickets/success/${ticketData.paymentReference}">View Ticket</a></p>
+            <p>You can also view and download your ticket at: <a href="${PUBLIC_BASE_URL}/tickets/success/${ticketData.paymentReference}">View Ticket</a></p>
             
             <p style="margin-top: 30px;">We look forward to seeing you at the event!</p>
             <p>Best regards,<br>The Event Team</p>
