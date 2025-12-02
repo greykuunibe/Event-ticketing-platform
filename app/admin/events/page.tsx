@@ -60,9 +60,9 @@ export default function EventsPage() {
       // Fetch stats and QR codes for each event
       const statsPromises = data.map(async (event: Event) => {
         try {
+          const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || window.location.origin).replace(/\/$/, '')
           const [statsRes, qrRes] = await Promise.all([
             fetch(`/api/events/${event.id}/details`),
-            const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || window.location.origin).replace(/\/$/, '')
             generateQRCode(`${baseUrl}/tickets/new?event=${event.qrCode}`)
           ])
 
