@@ -17,14 +17,14 @@ export const initializePayment = async (
     console.log('[PAYSTACK LIB] Initializing payment:', {
       email,
       amount,
-      amountInKobo: amount * 0.1,
+      amountInKobo: amount * 100,
       reference,
       callbackUrl
     })
 
     const response = await paystack.transaction.initialize({
       email,
-      amount: amount * 0.1, // Convert to kobo/pesewas
+      amount: amount * 100, // Convert to kobo/pesewas
       reference,
       metadata,
       callback_url: callbackUrl,
