@@ -7,12 +7,12 @@ export async function GET(request: NextRequest) {
   
   if (reference) {
     // Redirect to the path-based route
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin
+    const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin).replace(/\/$/, '')
     return NextResponse.redirect(`${baseUrl}/tickets/success/${encodeURIComponent(reference)}`)
   }
   
   // No reference - redirect to home
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin
+  const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin).replace(/\/$/, '')
   return NextResponse.redirect(`${baseUrl}/`)
 }
 

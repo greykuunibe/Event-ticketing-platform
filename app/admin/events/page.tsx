@@ -62,7 +62,8 @@ export default function EventsPage() {
         try {
           const [statsRes, qrRes] = await Promise.all([
             fetch(`/api/events/${event.id}/details`),
-            generateQRCode(`${process.env.NEXT_PUBLIC_BASE_URL || window.location.origin}/tickets/new?event=${event.qrCode}`)
+            const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || window.location.origin).replace(/\/$/, '')
+            generateQRCode(`${baseUrl}/tickets/new?event=${event.qrCode}`)
           ])
 
           if (statsRes.ok) {
@@ -169,7 +170,7 @@ export default function EventsPage() {
     if (!qrCodes[event.id]) return
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin
+      const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || window.location.origin).replace(/\/$/, '')
       const qrUrl = `${baseUrl}/tickets/new?event=${event.qrCode}`
       await navigator.clipboard.writeText(qrUrl)
       success('QR code link copied to clipboard!')
@@ -317,7 +318,7 @@ export default function EventsPage() {
             <div className="space-y-2">
               <button
                 onClick={async () => {
-                  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin
+                  const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || window.location.origin).replace(/\/$/, '')
                   const qrUrl = `${baseUrl}/tickets/new?event=${selectedEvent.qrCode}`
                   try {
                     await navigator.clipboard.writeText(qrUrl)

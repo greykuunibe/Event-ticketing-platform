@@ -11,7 +11,7 @@ export const initializePayment = async (
   metadata?: Record<string, any>
 ) => {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://event-ticketing-platform.netlify.app'
+    const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://event-ticketing-platform.netlify.app').replace(/\/$/, '')
     const callbackUrl = `${baseUrl}/tickets/success/${encodeURIComponent(reference)}`
     
     console.log('[PAYSTACK LIB] Initializing payment:', {

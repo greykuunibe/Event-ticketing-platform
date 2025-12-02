@@ -59,7 +59,7 @@ export const sendTicketEmail = async (
               </table>
             </div>
             
-            <p>You can also view and download your ticket at: <a href="${process.env.NEXT_PUBLIC_BASE_URL}/tickets/success/${ticketData.paymentReference}">View Ticket</a></p>
+            <p>You can also view and download your ticket at: <a href="${(process.env.NEXT_PUBLIC_BASE_URL || '').replace(/\/$/, '')}/tickets/success/${ticketData.paymentReference}">View Ticket</a></p>
             
             <p style="margin-top: 30px;">We look forward to seeing you at the event!</p>
             <p>Best regards,<br>The Event Team</p>

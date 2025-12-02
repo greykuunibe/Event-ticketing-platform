@@ -13,16 +13,16 @@ export async function GET(request: NextRequest) {
     if (reference) {
       // Redirect to success page with the payment reference in the path
       // This ensures the success page can find the ticket
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin
+      const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin).replace(/\/$/, '')
       return NextResponse.redirect(`${baseUrl}/tickets/success/${encodeURIComponent(reference)}`)
     }
     
     // If no reference, redirect to home
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin
+    const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin).replace(/\/$/, '')
     return NextResponse.redirect(`${baseUrl}/`)
   } catch (error) {
     console.error('Error handling webhook redirect:', error)
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin
+    const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin).replace(/\/$/, '')
     return NextResponse.redirect(`${baseUrl}/`)
   }
 }
