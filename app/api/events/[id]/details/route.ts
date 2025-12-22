@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { supabase } from '@/lib/supabase'
 
+// Paystack transaction fee: 1.95%
+const PAYSTACK_FEE_RATE = 0.0195
+const NET_REVENUE_MULTIPLIER = 1 - PAYSTACK_FEE_RATE // 0.9805
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -40,13 +44,18 @@ export async function GET(
     // Calculate unique participants (unique phone numbers)
     const uniqueParticipants = new Set(tickets?.map(t => t.phoneNumber).filter(Boolean) || []).size
 
+    // Calculate gross revenue from paid tickets
+    const grossRevenue = tickets
+      ?.filter((t) => t.paymentStatus === 'paid')
+      .reduce((sum, t) => sum + parseFloat(t.totalAmount.toString()), 0) || 0
+    // Apply Paystack fee: net revenue = gross revenue * (1 - 0.0195)
+    const totalRevenue = grossRevenue * NET_REVENUE_MULTIPLIER
+
     const stats = {
       totalTickets: tickets?.length || 0,
       paidTickets: tickets?.filter((t) => t.paymentStatus === 'paid').length || 0,
       pendingTickets: tickets?.filter((t) => t.paymentStatus === 'pending').length || 0,
-      totalRevenue: tickets
-        ?.filter((t) => t.paymentStatus === 'paid')
-        .reduce((sum, t) => sum + parseFloat(t.totalAmount.toString()), 0) || 0,
+      totalRevenue,
       totalQuantity: tickets?.reduce((sum, t) => sum + (t.quantity || 1), 0) || 0,
       participants: uniqueParticipants,
       ticketsByType: tickets?.reduce((acc: any, t) => {

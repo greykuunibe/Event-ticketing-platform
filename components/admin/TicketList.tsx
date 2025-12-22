@@ -6,6 +6,18 @@ import { AnimatePresence, motion } from 'framer-motion'
 import Dropdown from './Dropdown'
 import Image from 'next/image'
 
+// Paystack transaction fee: 1.95%
+const PAYSTACK_FEE_RATE = 0.0195
+const NET_REVENUE_MULTIPLIER = 1 - PAYSTACK_FEE_RATE // 0.9805
+
+// Calculate net revenue after Paystack fee (only for paid tickets)
+const calculateNetRevenue = (amount: number, paymentStatus: string): number => {
+  if (paymentStatus === 'paid') {
+    return amount * NET_REVENUE_MULTIPLIER
+  }
+  return amount // Return gross amount for pending/failed tickets
+}
+
 interface TicketItem {
   dish: string
   drink: string
@@ -340,7 +352,7 @@ export default function TicketList({ tickets, onRefresh, ticketTypes = [], viewM
                       {ticket.quantity || 1}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                      {formatCurrency(ticket.totalAmount)}
+                      {formatCurrency(calculateNetRevenue(ticket.totalAmount, ticket.paymentStatus))}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(ticket.paymentStatus)}
@@ -406,7 +418,7 @@ export default function TicketList({ tickets, onRefresh, ticketTypes = [], viewM
                   </div>
                   <div>
                     <p className="text-3xl font-semibold text-gray-900">
-                      {formatCurrency(selectedTicket.totalAmount)}
+                      {formatCurrency(calculateNetRevenue(selectedTicket.totalAmount, selectedTicket.paymentStatus))}
                     </p>
                     <p className="text-sm text-gray-500">{selectedTicket.ticketType}</p>
                   </div>
@@ -590,7 +602,7 @@ export default function TicketList({ tickets, onRefresh, ticketTypes = [], viewM
                         </p>
                         <p className="text-xs text-gray-500">
                           {selectedTicket.paymentStatus === 'paid' 
-                            ? `Payment of ${formatCurrency(selectedTicket.totalAmount)} received.`
+                            ? `Payment of ${formatCurrency(selectedTicket.totalAmount)} received. Net revenue: ${formatCurrency(calculateNetRevenue(selectedTicket.totalAmount, selectedTicket.paymentStatus))}`
                             : 'Waiting for payment to be completed.'}
                         </p>
                       </div>

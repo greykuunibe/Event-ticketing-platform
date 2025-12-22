@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { supabase } from '@/lib/supabase'
 
+// Paystack transaction fee: 1.95%
+const PAYSTACK_FEE_RATE = 0.0195
+const NET_REVENUE_MULTIPLIER = 1 - PAYSTACK_FEE_RATE // 0.9805
+
 export async function GET(request: NextRequest) {
   try {
     const user = await getAuthenticatedUser()
@@ -113,10 +117,12 @@ export async function GET(request: NextRequest) {
 
     // Get paid tickets for revenue calculation
     const revenueData = allTicketsData?.filter(t => t.paymentStatus === 'paid') || []
-    const totalRevenue = revenueData.reduce((sum, ticket) => sum + Number(ticket.totalAmount), 0)
+    const grossRevenue = revenueData.reduce((sum, ticket) => sum + Number(ticket.totalAmount), 0)
+    // Apply Paystack fee: net revenue = gross revenue * (1 - 0.0195)
+    const totalRevenue = grossRevenue * NET_REVENUE_MULTIPLIER
     const paidQuantity = revenueData.reduce((sum, ticket) => sum + (ticket.quantity || 1), 0)
     
-    // Calculate average ticket price (based on paid tickets only)
+    // Calculate average ticket price (based on paid tickets only, after Paystack fee)
     const averageTicketPrice = paidQuantity > 0 
       ? totalRevenue / paidQuantity 
       : 0
@@ -154,14 +160,18 @@ export async function GET(request: NextRequest) {
     // Calculate today's metrics
     const todayQuantitySold = todayTicketsData?.reduce((sum, ticket) => sum + (ticket.quantity || 1), 0) || 0
     const todayRevenueData = todayTicketsData?.filter(t => t.paymentStatus === 'paid') || []
-    const todayRevenue = todayRevenueData.reduce((sum, ticket) => sum + Number(ticket.totalAmount), 0)
+    const todayGrossRevenue = todayRevenueData.reduce((sum, ticket) => sum + Number(ticket.totalAmount), 0)
+    // Apply Paystack fee to today's revenue
+    const todayRevenue = todayGrossRevenue * NET_REVENUE_MULTIPLIER
     const todayCustomersData = todayTicketsData?.map(t => t.phoneNumber) || []
     const todayUniqueCustomers = new Set(todayCustomersData).size
 
     // Calculate yesterday's metrics
     const yesterdayQuantitySold = yesterdayTicketsData?.reduce((sum, ticket) => sum + (ticket.quantity || 1), 0) || 0
     const yesterdayRevenueData = yesterdayTicketsData?.filter(t => t.paymentStatus === 'paid') || []
-    const yesterdayRevenue = yesterdayRevenueData.reduce((sum, ticket) => sum + Number(ticket.totalAmount), 0)
+    const yesterdayGrossRevenue = yesterdayRevenueData.reduce((sum, ticket) => sum + Number(ticket.totalAmount), 0)
+    // Apply Paystack fee to yesterday's revenue
+    const yesterdayRevenue = yesterdayGrossRevenue * NET_REVENUE_MULTIPLIER
     const yesterdayCustomersData = yesterdayTicketsData?.map(t => t.phoneNumber) || []
     const yesterdayUniqueCustomers = new Set(yesterdayCustomersData).size
 
