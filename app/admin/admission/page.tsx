@@ -122,7 +122,7 @@ export default function AdmissionPage() {
       // Log ticket types for debugging
       if (process.env.NODE_ENV === 'development') {
         console.log('Ticket types loaded:', Array.from(ticketTypeMap.entries()))
-        console.log('Unique ticket types in paid tickets:', Array.from(new Set(paidTickets.map(t => t.ticketType))))
+        console.log('Unique ticket types in paid tickets:', Array.from(new Set(paidTickets.map((t: Ticket) => t.ticketType))))
       }
 
       // Helper function to get peoplePerTicket with fallback

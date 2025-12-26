@@ -158,7 +158,7 @@ export async function GET(request: NextRequest) {
     // Get today's data
     let todayQuery = supabase
       .from('tickets')
-      .select('quantity, totalAmount, paymentStatus, phoneNumber, createdAt, ticketType')
+      .select('quantity, totalAmount, paymentStatus, phoneNumber, createdAt, ticketType, isDirectPayment')
       .in('eventId', userEventIds)
       .gte('createdAt', todayStart.toISOString())
     if (eventId) {
@@ -169,7 +169,7 @@ export async function GET(request: NextRequest) {
     // Get yesterday's data
     let yesterdayQuery = supabase
       .from('tickets')
-      .select('quantity, totalAmount, paymentStatus, phoneNumber, createdAt, ticketType')
+      .select('quantity, totalAmount, paymentStatus, phoneNumber, createdAt, ticketType, isDirectPayment')
       .in('eventId', userEventIds)
       .gte('createdAt', yesterdayStart.toISOString())
       .lt('createdAt', yesterdayEnd.toISOString())

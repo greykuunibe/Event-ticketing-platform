@@ -219,7 +219,7 @@ export default function EventsPage() {
         <div className="flex justify-end">
           <button
             onClick={() => setShowCreateForm(true)}
-            className="flex items-center justify-center gap-2 bg-gradient-to-br from-zinc-900 to-zinc-700 border border-zinc-200 text-white px-4 py-2 rounded-xl active:opacity-80 active:scale-[0.95] transition-transform"
+            className="flex items-center justify-center gap-2 bg-linear-to-br from-zinc-900 to-zinc-700 border border-zinc-200 text-white px-4 py-2 rounded-xl active:opacity-80 active:scale-[0.95] transition-transform"
           >
             <PlusIcon size={16} weight="fill" />
             <span className="active:scale-[0.95] transition-transform">Create Event</span>
@@ -288,7 +288,7 @@ export default function EventsPage() {
                 <button
                   type="submit"
                   disabled={creating}
-                  className="flex items-center justify-center gap-2 bg-gradient-to-br from-zinc-900 to-zinc-700 border border-zinc-200 text-white px-4 py-2 rounded-xl active:opacity-80 active:scale-[0.95] transition-transform disabled:opacity-50"
+                  className="flex items-center justify-center gap-2 bg-linear-to-br from-zinc-900 to-zinc-700 border border-zinc-200 text-white px-4 py-2 rounded-xl active:opacity-80 active:scale-[0.95] transition-transform disabled:opacity-50"
                 >
                   <span className="active:scale-[0.95] transition-transform">{creating ? 'Creating...' : 'Create Event'}</span>
                 </button>
@@ -327,7 +327,7 @@ export default function EventsPage() {
                     showError('Failed to copy link')
                   }
                 }}
-                className="flex items-center justify-center gap-2 w-full bg-gradient-to-br from-zinc-900 to-zinc-700 border border-zinc-200 text-white px-4 py-2 rounded-xl active:opacity-80 active:scale-[0.95] transition-transform"
+                className="flex items-center justify-center gap-2 w-full bg-linear-to-br from-zinc-900 to-zinc-700 border border-zinc-200 text-white px-4 py-2 rounded-xl active:opacity-80 active:scale-[0.95] transition-transform"
               >
                 <span className="active:scale-[0.95] transition-transform">Copy Link</span>
               </button>
