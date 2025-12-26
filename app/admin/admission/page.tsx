@@ -36,6 +36,7 @@ interface Ticket {
   totalAmount: number
   paymentStatus: string
   paymentReference: string | null
+  isDirectPayment: boolean
   items: TicketItem[]
   createdAt: string
   eventId: string
@@ -95,9 +96,59 @@ export default function AdmissionPage() {
       setTickets(paidTickets)
       setFilteredTickets(paidTickets)
 
-      // Calculate statistics
-      const totalPaid = paidTickets.length
-      const admitted = paidTickets.filter((t: Ticket) => t.admitted).length
+      // Fetch ticket types to get peoplePerTicket values
+      const ticketTypesResponse = await fetch('/api/admin/ticket-types')
+      if (!ticketTypesResponse.ok) {
+        console.error('Failed to fetch ticket types:', ticketTypesResponse.status, ticketTypesResponse.statusText)
+      }
+      const ticketTypes = ticketTypesResponse.ok ? await ticketTypesResponse.json() : []
+      
+      if (ticketTypes.length === 0) {
+        console.warn('No ticket types found. All calculations will default to 1 person per ticket.')
+      }
+      
+      // Create a map of ticket type name to peoplePerTicket (case-insensitive matching)
+      const ticketTypeMap = new Map<string, number>()
+      ticketTypes.forEach((tt: any) => {
+        if (tt.name) {
+          // Store both exact match and lowercase match for flexibility
+          const name = tt.name.trim()
+          const peoplePerTicket = Number(tt.peoplePerTicket) || 1
+          ticketTypeMap.set(name, peoplePerTicket)
+          ticketTypeMap.set(name.toLowerCase(), peoplePerTicket) // Also store lowercase for matching
+        }
+      })
+      
+      // Log ticket types for debugging
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Ticket types loaded:', Array.from(ticketTypeMap.entries()))
+        console.log('Unique ticket types in paid tickets:', Array.from(new Set(paidTickets.map(t => t.ticketType))))
+      }
+
+      // Helper function to get peoplePerTicket with fallback
+      const getPeoplePerTicket = (ticketType: string): number => {
+        const exact = ticketTypeMap.get(ticketType)
+        if (exact !== undefined) return exact
+        const lower = ticketTypeMap.get(ticketType.toLowerCase())
+        if (lower !== undefined) return lower
+        // If not found, default to 1 but log a warning
+        console.warn(`Ticket type "${ticketType}" not found in ticket types map. Defaulting to 1 person per ticket.`)
+        return 1
+      }
+
+      // Calculate statistics based on actual people count (quantity * peoplePerTicket)
+      const totalPaid = paidTickets.reduce((sum: number, ticket: Ticket) => {
+        const peoplePerTicket = getPeoplePerTicket(ticket.ticketType)
+        return sum + (ticket.quantity || 1) * peoplePerTicket
+      }, 0)
+      
+      const admitted = paidTickets
+        .filter((t: Ticket) => t.admitted)    
+        .reduce((sum: number, ticket: Ticket) => {
+          const peoplePerTicket = getPeoplePerTicket(ticket.ticketType)
+          return sum + (ticket.quantity || 1) * peoplePerTicket
+        }, 0)
+      
       const notAdmitted = totalPaid - admitted
       const admissionRate = totalPaid > 0 ? (admitted / totalPaid) * 100 : 0
 
@@ -354,6 +405,9 @@ export default function AdmissionPage() {
                   Payment Ref
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Payment Method
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -367,7 +421,7 @@ export default function AdmissionPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredTickets.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                     <div className="flex flex-col items-center gap-2">
                       <TicketIcon size={48} className="text-gray-400" />
                       <p className="text-sm">
@@ -410,6 +464,11 @@ export default function AdmissionPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-900">
+                        {ticket.isDirectPayment ? 'Direct Deposit' : 'Paystack'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
                       {ticket.admitted ? (
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                           <CheckCircleIcon size={14} weight="fill" />
@@ -434,7 +493,7 @@ export default function AdmissionPage() {
                         <button
                           onClick={() => handleAdmit(ticket.id)}
                           disabled={admitting === ticket.id}
-                          className="flex items-center justify-center gap-2 bg-gradient-to-br from-zinc-900 to-zinc-700 border border-zinc-200 text-white px-4 py-2 rounded-xl active:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex items-center justify-center gap-2 bg-linear-to-br from-zinc-900 to-zinc-700 border border-zinc-200 text-white px-4 py-2 rounded-xl active:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {admitting === ticket.id ? (
                             <>

@@ -17,7 +17,7 @@ export default function AdmissionStatistics({
 }: AdmissionStatisticsProps) {
   const stats = [
     {
-      label: 'Total Paid Tickets',
+      label: 'Total Paid Attendees',
       value: totalPaid,
       change: 0,
       changeLabel: 'N/A',

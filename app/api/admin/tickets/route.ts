@@ -107,20 +107,41 @@ export async function GET(request: NextRequest) {
     const uniqueCustomers = new Set(uniqueCustomersData?.map(t => t.phoneNumber) || []).size
 
     // Get all tickets for quantity calculation (all tickets sold, regardless of payment status)
-    let allTicketsQuery = supabase.from('tickets').select('quantity, totalAmount, paymentStatus').in('eventId', userEventIds)
+    let allTicketsQuery = supabase.from('tickets').select('quantity, totalAmount, paymentStatus, ticketType, isDirectPayment').in('eventId', userEventIds)
     if (eventId) {
       allTicketsQuery = allTicketsQuery.eq('eventId', eventId)
     }
     const { data: allTicketsData } = await allTicketsQuery
 
-    const totalQuantitySold = allTicketsData?.reduce((sum, ticket) => sum + (ticket.quantity || 1), 0) || 0
+    // Get ticket types to map ticketType name to peoplePerTicket
+    const { data: ticketTypes } = await supabase
+      .from('ticket_types')
+      .select('name, peoplePerTicket')
+      .eq('userId', user.id)
+
+    // Create a map of ticket type name to peoplePerTicket
+    const ticketTypeMap = new Map(
+      ticketTypes?.map(tt => [tt.name, tt.peoplePerTicket || 1]) || []
+    )
+
+    // Calculate total quantity sold: quantity * peoplePerTicket for each ticket
+    const totalQuantitySold = allTicketsData?.reduce((sum, ticket) => {
+      const peoplePerTicket = ticketTypeMap.get(ticket.ticketType) || 1
+      return sum + (ticket.quantity || 1) * peoplePerTicket
+    }, 0) || 0
 
     // Get paid tickets for revenue calculation
     const revenueData = allTicketsData?.filter(t => t.paymentStatus === 'paid') || []
-    const grossRevenue = revenueData.reduce((sum, ticket) => sum + Number(ticket.totalAmount), 0)
-    // Apply Paystack fee: net revenue = gross revenue * (1 - 0.0195)
-    const totalRevenue = grossRevenue * NET_REVENUE_MULTIPLIER
-    const paidQuantity = revenueData.reduce((sum, ticket) => sum + (ticket.quantity || 1), 0)
+    // Calculate net revenue: apply Paystack fee only for non-direct payments
+    const totalRevenue = revenueData.reduce((sum, ticket) => {
+      const amount = Number(ticket.totalAmount)
+      // If direct payment, use full amount; otherwise apply Paystack fee
+      return sum + (ticket.isDirectPayment ? amount : amount * NET_REVENUE_MULTIPLIER)
+    }, 0)
+    const paidQuantity = revenueData.reduce((sum, ticket) => {
+      const peoplePerTicket = ticketTypeMap.get(ticket.ticketType) || 1
+      return sum + (ticket.quantity || 1) * peoplePerTicket
+    }, 0)
     
     // Calculate average ticket price (based on paid tickets only, after Paystack fee)
     const averageTicketPrice = paidQuantity > 0 
@@ -137,7 +158,7 @@ export async function GET(request: NextRequest) {
     // Get today's data
     let todayQuery = supabase
       .from('tickets')
-      .select('quantity, totalAmount, paymentStatus, phoneNumber, createdAt')
+      .select('quantity, totalAmount, paymentStatus, phoneNumber, createdAt, ticketType')
       .in('eventId', userEventIds)
       .gte('createdAt', todayStart.toISOString())
     if (eventId) {
@@ -148,7 +169,7 @@ export async function GET(request: NextRequest) {
     // Get yesterday's data
     let yesterdayQuery = supabase
       .from('tickets')
-      .select('quantity, totalAmount, paymentStatus, phoneNumber, createdAt')
+      .select('quantity, totalAmount, paymentStatus, phoneNumber, createdAt, ticketType')
       .in('eventId', userEventIds)
       .gte('createdAt', yesterdayStart.toISOString())
       .lt('createdAt', yesterdayEnd.toISOString())
@@ -158,20 +179,30 @@ export async function GET(request: NextRequest) {
     const { data: yesterdayTicketsData } = await yesterdayQuery
 
     // Calculate today's metrics
-    const todayQuantitySold = todayTicketsData?.reduce((sum, ticket) => sum + (ticket.quantity || 1), 0) || 0
+    const todayQuantitySold = todayTicketsData?.reduce((sum, ticket) => {
+      const peoplePerTicket = ticketTypeMap.get(ticket.ticketType) || 1
+      return sum + (ticket.quantity || 1) * peoplePerTicket
+    }, 0) || 0
     const todayRevenueData = todayTicketsData?.filter(t => t.paymentStatus === 'paid') || []
-    const todayGrossRevenue = todayRevenueData.reduce((sum, ticket) => sum + Number(ticket.totalAmount), 0)
-    // Apply Paystack fee to today's revenue
-    const todayRevenue = todayGrossRevenue * NET_REVENUE_MULTIPLIER
+    // Calculate today's net revenue: apply Paystack fee only for non-direct payments
+    const todayRevenue = todayRevenueData.reduce((sum, ticket) => {
+      const amount = Number(ticket.totalAmount)
+      return sum + (ticket.isDirectPayment ? amount : amount * NET_REVENUE_MULTIPLIER)
+    }, 0)
     const todayCustomersData = todayTicketsData?.map(t => t.phoneNumber) || []
     const todayUniqueCustomers = new Set(todayCustomersData).size
 
     // Calculate yesterday's metrics
-    const yesterdayQuantitySold = yesterdayTicketsData?.reduce((sum, ticket) => sum + (ticket.quantity || 1), 0) || 0
+    const yesterdayQuantitySold = yesterdayTicketsData?.reduce((sum, ticket) => {
+      const peoplePerTicket = ticketTypeMap.get(ticket.ticketType) || 1
+      return sum + (ticket.quantity || 1) * peoplePerTicket
+    }, 0) || 0
     const yesterdayRevenueData = yesterdayTicketsData?.filter(t => t.paymentStatus === 'paid') || []
-    const yesterdayGrossRevenue = yesterdayRevenueData.reduce((sum, ticket) => sum + Number(ticket.totalAmount), 0)
-    // Apply Paystack fee to yesterday's revenue
-    const yesterdayRevenue = yesterdayGrossRevenue * NET_REVENUE_MULTIPLIER
+    // Calculate yesterday's net revenue: apply Paystack fee only for non-direct payments
+    const yesterdayRevenue = yesterdayRevenueData.reduce((sum, ticket) => {
+      const amount = Number(ticket.totalAmount)
+      return sum + (ticket.isDirectPayment ? amount : amount * NET_REVENUE_MULTIPLIER)
+    }, 0)
     const yesterdayCustomersData = yesterdayTicketsData?.map(t => t.phoneNumber) || []
     const yesterdayUniqueCustomers = new Set(yesterdayCustomersData).size
 

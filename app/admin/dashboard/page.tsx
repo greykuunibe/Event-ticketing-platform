@@ -34,6 +34,7 @@ interface Ticket {
   totalAmount: number
   paymentStatus: string
   paymentReference: string | null
+  isDirectPayment: boolean
   items: TicketItem[]
   createdAt: string
   eventId: string
