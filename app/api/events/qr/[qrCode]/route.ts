@@ -18,6 +18,23 @@ export async function GET(
       return NextResponse.json({ error: 'Event not found' }, { status: 404 })
     }
 
+    // Check if QR code has expired
+    if (event.qrCodeExpiresAt) {
+      const expirationDate = new Date(event.qrCodeExpiresAt)
+      const now = new Date()
+      
+      if (now > expirationDate) {
+        return NextResponse.json(
+          { 
+            error: 'QR code expired',
+            expired: true,
+            expiresAt: event.qrCodeExpiresAt
+          },
+          { status: 410 } // 410 Gone - resource is no longer available
+        )
+      }
+    }
+
     return NextResponse.json(event)
   } catch (error) {
     console.error('Error fetching event by QR:', error)

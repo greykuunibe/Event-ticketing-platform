@@ -18,6 +18,19 @@ export async function POST(request: NextRequest) {
     // Generate unique QR code identifier
     const qrCode = randomBytes(16).toString('base64url')
 
+    // Calculate QR code expiration date
+    // If eventDate exists, expire on eventDate, otherwise expire 30 days from now
+    const createdAt = new Date()
+    let qrCodeExpiresAt: Date
+    if (eventDate) {
+      const eventDateObj = new Date(eventDate)
+      // Expire on event date, but at least 1 day from now
+      qrCodeExpiresAt = eventDateObj > createdAt ? eventDateObj : new Date(createdAt.getTime() + 24 * 60 * 60 * 1000)
+    } else {
+      // Default to 30 days from creation
+      qrCodeExpiresAt = new Date(createdAt.getTime() + 30 * 24 * 60 * 60 * 1000)
+    }
+
     const { data: event, error } = await supabase
       .from('events')
       .insert({
@@ -26,6 +39,7 @@ export async function POST(request: NextRequest) {
         eventDate: eventDate ? new Date(eventDate).toISOString() : null,
         location: location || null,
         qrCode,
+        qrCodeExpiresAt: qrCodeExpiresAt.toISOString(),
         userId: user.id,
       })
       .select()

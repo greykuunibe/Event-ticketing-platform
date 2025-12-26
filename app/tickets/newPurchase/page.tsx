@@ -60,6 +60,15 @@ function NewTicketContent() {
     try {
       setLoadingEvent(true)
       const response = await fetch(`/api/events/qr/${eventQrCode}`)
+      
+      if (response.status === 410) {
+        // QR code expired
+        const errorData = await response.json()
+        showError('This QR code has expired. Please contact the event organizer for a new QR code.')
+        router.push('/')
+        return
+      }
+      
       if (!response.ok) {
         throw new Error('Event not found')
       }
@@ -297,7 +306,8 @@ function NewTicketContent() {
     return (
       <div className="min-h-screen bg-stone-100 flex items-center justify-center px-4">
         <div className="bg-white border border-zinc-200 rounded-lg p-8 max-w-md w-full text-center">
-          <p className="text-red-600 mb-4">Event not found</p>
+          <p className="text-red-600 mb-4">This QR code has expired or the event was not found.</p>
+          <p className="text-sm text-gray-600 mb-4">Please contact the event organizer for a new QR code.</p>
           <Link href="/" className="text-sm text-gray-500">
             ← Back to home
           </Link>
